@@ -3,7 +3,7 @@
   "name": "Chrono Shards",
   "short_name": "Chrono Shards",
   "description": "Escolha seu personagem, domine habilidades únicas, enfrente hordas cada vez mais brutais e evolua sua build com power-ups, relíquias, maestrias e recompensas raras. Cada partida é uma nova tentativa de ir mais longe, derrotar chefes mais perigosos e descobrir até onde você consegue resistir antes que o Eclipse consuma tudo. Com combate rápido, efeitos visuais intensos, progressão permanente, personagens desbloqueáveis, bosses secretos, baús chronais, missões, fissuras temporais e controles adaptados para mobile, Chrono Shards transforma cada run em uma batalha caótica, estratégica e viciante.",
-  "start_url": "/",
+  "start_url": "https://chrono-shards-mobile.vercel.app/",
   "scope": "/",
   "display": "fullscreen",
   "orientation": "landscape",
@@ -32,6 +32,36 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "screenshots/showcase-1.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Combate em arena com poderes chronais e efeitos visuais intensos."
+    },
+    {
+      "src": "screenshots/showcase-2.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Batalhas contra hordas, projéteis, bosses e eventos especiais."
+    },
+    {
+      "src": "screenshots/showcase-3.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Mapas neon com obstáculos, inimigos, loot e progressão por run."
+    },
+    {
+      "src": "screenshots/showcase-4.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Habilidades únicas, escudos, ataques especiais e caos temporal."
     }
   ],
   "dir": "auto"
