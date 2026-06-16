@@ -1,0 +1,34 @@
+{
+  "id": "./",
+  "name": "Chrono Shards — Eclipse Update",
+  "short_name": "Chrono Shards",
+  "description": "Jogo de navegador em arena roguelite com waves, bosses, personagens, relíquias e poderes chronais.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#020408",
+  "theme_color": "#090d1f",
+  "lang": "pt-BR",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
