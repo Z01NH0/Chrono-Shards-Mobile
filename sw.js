@@ -1,4 +1,4 @@
-const CACHE_NAME = "chrono-shards-eclipse-v1";
+const CACHE_NAME = "chrono-shards-eclipse-v2-mobile-592";
 
 const PRECACHE_URLS = [
   "./",
