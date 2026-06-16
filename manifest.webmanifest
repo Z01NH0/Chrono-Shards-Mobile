@@ -1,16 +1,19 @@
 {
-  "id": "./",
-  "name": "Chrono Shards — Eclipse Update",
+  "id": "/",
+  "name": "Chrono Shards",
   "short_name": "Chrono Shards",
-  "description": "Jogo de navegador em arena roguelite com waves, bosses, personagens, relíquias e poderes chronais.",
-  "start_url": "./",
-  "scope": "./",
+  "description": "Escolha seu personagem, domine habilidades únicas, enfrente hordas cada vez mais brutais e evolua sua build com power-ups, relíquias, maestrias e recompensas raras. Cada partida é uma nova tentativa de ir mais longe, derrotar chefes mais perigosos e descobrir até onde você consegue resistir antes que o Eclipse consuma tudo. Com combate rápido, efeitos visuais intensos, progressão permanente, personagens desbloqueáveis, bosses secretos, baús chronais, missões, fissuras temporais e controles adaptados para mobile, Chrono Shards transforma cada run em uma batalha caótica, estratégica e viciante.",
+  "start_url": "/",
+  "scope": "/",
   "display": "fullscreen",
   "orientation": "landscape",
   "background_color": "#020408",
   "theme_color": "#090d1f",
   "lang": "pt-BR",
-  "categories": ["games", "entertainment"],
+  "categories": [
+    "games",
+    "entertainment"
+  ],
   "icons": [
     {
       "src": "icons/icon-192.png",
@@ -30,5 +33,6 @@
       "type": "image/png",
       "purpose": "maskable"
     }
-  ]
+  ],
+  "dir": "auto"
 }
