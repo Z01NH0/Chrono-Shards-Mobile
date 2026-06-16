@@ -233,12 +233,17 @@ button:hover{transform:translateY(-2px) scale(1.015);filter:brightness(1.08)}
 </style>
 
 <style id="chronoPwaMobileControlsStyle">
-/* CHRONO SHARDS — PWA + CONTROLES MOBILE
-   Aparece somente em telas touch quando a partida está rodando e o overlay está fechado. */
+/* CHRONO SHARDS — PWA + CONTROLES MOBILE COMPACTOS
+   Foco: caber melhor em celular, principalmente em landscape/fullscreen. */
 :root{
   --cs-safe-bottom:env(safe-area-inset-bottom,0px);
   --cs-safe-left:env(safe-area-inset-left,0px);
   --cs-safe-right:env(safe-area-inset-right,0px);
+  --cs-joy-size:clamp(94px,15vmin,112px);
+  --cs-joy-knob:calc(var(--cs-joy-size) * .42);
+  --cs-knob-travel:calc(var(--cs-joy-size) * .25);
+  --cs-skill-size:clamp(42px,7.2vmin,48px);
+  --cs-dash-size:clamp(46px,7.7vmin,52px);
 }
 canvas#game,.cs-mobile-controls,.cs-mobile-controls *{
   touch-action:none;
@@ -246,7 +251,7 @@ canvas#game,.cs-mobile-controls,.cs-mobile-controls *{
   user-select:none;
   -webkit-tap-highlight-color:transparent;
 }
-body.cs-touch-playing{overscroll-behavior:none}
+body.cs-touch-playing,body.cs-mobile-scaled{overscroll-behavior:none}
 .cs-mobile-controls{
   display:none;
   position:fixed;
@@ -256,90 +261,170 @@ body.cs-touch-playing{overscroll-behavior:none}
   font-family:'Rajdhani',system-ui,sans-serif;
 }
 .cs-joy{
-  --size:132px;
+  --size:var(--cs-joy-size);
   position:absolute;
   width:var(--size);
   height:var(--size);
   border-radius:999px;
   pointer-events:auto;
   background:
-    radial-gradient(circle at 50% 50%,rgba(97,218,251,.18),rgba(159,108,255,.10) 55%,rgba(4,8,18,.70) 100%);
-  border:1px solid rgba(130,210,255,.28);
-  box-shadow:0 0 28px rgba(97,218,251,.20),inset 0 0 24px rgba(255,255,255,.045);
-  backdrop-filter:blur(10px);
-  -webkit-backdrop-filter:blur(10px);
+    radial-gradient(circle at 50% 50%,rgba(97,218,251,.16),rgba(159,108,255,.08) 55%,rgba(4,8,18,.64) 100%);
+  border:1px solid rgba(130,210,255,.24);
+  box-shadow:0 0 20px rgba(97,218,251,.16),inset 0 0 18px rgba(255,255,255,.04);
+  backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
 }
 .cs-joy::before{
   content:'';
   position:absolute;
-  inset:22px;
+  inset:calc(var(--size) * .18);
   border-radius:999px;
-  border:1px dashed rgba(210,235,255,.18);
+  border:1px dashed rgba(210,235,255,.15);
 }
 .cs-joy-knob{
   position:absolute;
   left:50%;
   top:50%;
-  width:58px;
-  height:58px;
+  width:var(--cs-joy-knob);
+  height:var(--cs-joy-knob);
   transform:translate(-50%,-50%);
   border-radius:999px;
-  background:linear-gradient(135deg,rgba(100,225,255,.92),rgba(160,108,255,.84));
-  border:1px solid rgba(255,255,255,.46);
-  box-shadow:0 0 22px rgba(97,218,251,.46),inset 0 0 18px rgba(255,255,255,.20);
+  background:linear-gradient(135deg,rgba(100,225,255,.88),rgba(160,108,255,.80));
+  border:1px solid rgba(255,255,255,.40);
+  box-shadow:0 0 18px rgba(97,218,251,.38),inset 0 0 14px rgba(255,255,255,.16);
 }
 .cs-joy-label{
   position:absolute;
   left:50%;
-  bottom:-24px;
+  bottom:-18px;
   transform:translateX(-50%);
-  color:rgba(230,245,255,.74);
+  color:rgba(230,245,255,.68);
   font-weight:900;
-  letter-spacing:.12em;
-  font-size:10px;
+  letter-spacing:.10em;
+  font-size:9px;
   text-shadow:0 0 8px rgba(0,0,0,.9);
   pointer-events:none;
   white-space:nowrap;
 }
 #csMoveJoy{
-  left:calc(22px + var(--cs-safe-left));
-  bottom:calc(28px + var(--cs-safe-bottom));
+  left:calc(14px + var(--cs-safe-left));
+  bottom:calc(16px + var(--cs-safe-bottom));
 }
 #csAimJoy{
-  right:calc(22px + var(--cs-safe-right));
-  bottom:calc(28px + var(--cs-safe-bottom));
+  right:calc(14px + var(--cs-safe-right));
+  bottom:calc(16px + var(--cs-safe-bottom));
 }
 .cs-dash-btn{
   position:absolute;
-  right:calc(166px + var(--cs-safe-right));
-  bottom:calc(18px + var(--cs-safe-bottom));
-  width:62px;
-  height:62px;
-  border-radius:18px;
+  right:calc(var(--cs-joy-size) + 26px + var(--cs-safe-right));
+  bottom:calc(10px + var(--cs-safe-bottom));
+  width:var(--cs-dash-size);
+  height:var(--cs-dash-size);
+  border-radius:15px;
   pointer-events:auto;
   display:grid;
   place-items:center;
   color:#08101d;
   font-weight:900;
-  font-size:12px;
-  letter-spacing:.08em;
+  font-size:10px;
+  letter-spacing:.06em;
   background:linear-gradient(135deg,#ffd166,#fff0aa);
-  box-shadow:0 0 22px rgba(255,209,102,.36),inset 0 0 16px rgba(255,255,255,.23);
-  border:1px solid rgba(255,255,255,.36);
+  box-shadow:0 0 18px rgba(255,209,102,.32),inset 0 0 12px rgba(255,255,255,.20);
+  border:1px solid rgba(255,255,255,.32);
 }
 .cs-dash-btn:active{transform:scale(.94);filter:brightness(1.14)}
+
 @media (hover:none),(pointer:coarse){
+  html,body{width:100vw;height:100dvh;overflow:hidden}
+  .game-shell{width:100vw!important;height:100dvh!important;overflow:hidden!important;place-items:center!important}
+  canvas#game{
+    width:min(100vw,174.36dvh)!important;
+    height:min(100dvh,57.35vw)!important;
+    max-width:100vw!important;
+    max-height:100dvh!important;
+    border-radius:10px!important;
+    box-shadow:0 0 34px rgba(80,140,255,.10),inset 0 0 28px rgba(0,0,0,.52)!important;
+  }
+  .hud{
+    top:5px!important;
+    width:min(100vw,174.36dvh)!important;
+    padding:0 6px!important;
+    gap:4px!important;
+  }
+  .left-panel{transform:scale(.74);transform-origin:top left;gap:4px!important}
+  .right-panel{transform:scale(.74);transform-origin:top right;align-items:flex-end;gap:4px!important}
+  .stats{min-width:218px!important;padding:8px 9px!important;gap:5px!important;border-radius:11px!important}
+  .stats>div{grid-template-columns:50px 1fr!important;gap:6px!important;font-size:10px!important}
+  .bar{height:6px!important}
+  .scoreboard{
+    min-width:158px!important;
+    padding:8px 9px!important;
+    border-radius:11px!important;
+    gap:3px 7px!important;
+    font-size:10px!important;
+    grid-template-columns:repeat(2,max-content)!important;
+    align-items:center!important;
+  }
+  .scoreboard .combo-counter{font-size:11px!important}
+  .title{font-size:13px!important;letter-spacing:.12em!important}
+  .wave-announce{font-size:clamp(24px,5.6vw,36px)!important;max-width:90vw!important}
+  .weapon-return-wrap{display:none!important}
+
+  .overlay{padding:6px!important;align-items:center!important;justify-items:center!important}
+  .card{
+    width:min(96vw,820px)!important;
+    max-height:calc(100dvh - 12px)!important;
+    padding:clamp(10px,2vw,16px)!important;
+    border-radius:18px!important;
+    overflow:auto!important;
+    scrollbar-width:thin;
+  }
+  .card h1{font-size:clamp(21px,4.2vw,30px)!important;line-height:1.05!important;margin-bottom:6px!important}
+  .card h2{font-size:clamp(16px,3.1vw,22px)!important;line-height:1.15!important}
+  .card h3{font-size:clamp(13px,2.4vw,17px)!important}
+  .card p{font-size:clamp(11px,2.05vw,13px)!important;line-height:1.42!important;margin-bottom:8px!important}
+  .muted,.tipline{font-size:10px!important;margin-top:6px!important}
+  .pick-grid,.shop-grid,.upgrade-grid,.relic-grid{
+    grid-template-columns:repeat(auto-fit,minmax(150px,1fr))!important;
+    gap:7px!important;
+    margin-top:9px!important;
+  }
+  .pick-btn,.shop-btn,.upgrade-btn,.relic-btn{
+    padding:9px 10px!important;
+    border-radius:12px!important;
+    min-height:unset!important;
+  }
+  .pick-btn strong,.shop-btn strong,.upgrade-btn strong,.relic-btn strong{font-size:12px!important;margin-bottom:2px!important}
+  .pick-btn span,.shop-btn span,.upgrade-btn span,.relic-btn span{font-size:10.5px!important;line-height:1.25!important}
+  .main-btn,.mini-action-btn,button{
+    font-size:12px!important;
+  }
+  .main-btn{padding:10px 18px!important}
+  .class-tag{font-size:9px!important;padding:2px 6px!important}
+
+  /* compactação para interfaces adicionadas nos patches mais novos */
+  .dune461,.riftRepairPolish591,.powerPage544,.infoOnly551{max-width:min(96vw,820px)!important}
+  .dunePanel461,.riftRepairSection591,.masteryPreview552{padding:9px!important;border-radius:14px!important}
+  .riftRepairSplit591{gap:9px!important}
+  .riftRepairCard591{min-height:unset!important;gap:5px!important}
+  .statsGrid461,.powerGrid544,.riftShopGrid509,.classGrid461,.missionGrid461,.duneGrid461{
+    gap:7px!important;
+    grid-template-columns:repeat(auto-fit,minmax(145px,1fr))!important;
+  }
+  .powerTop544,.riftRepairHead591{padding-bottom:6px!important}
+  .badge461,.powerTag544{font-size:9px!important}
+
   body.cs-touch-playing .cs-mobile-controls{display:block}
   body.cs-touch-playing canvas#game{cursor:none}
 
-  /* Barra REAL de habilidades reposicionada em arco/cobertura ao redor do joystick direito. */
+  /* Barra REAL de habilidades em arco pequeno ao redor do joystick direito. */
   body.cs-touch-playing #skillBar{
     position:fixed!important;
     left:auto!important;
     right:calc(0px + var(--cs-safe-right))!important;
-    bottom:calc(105px + var(--cs-safe-bottom))!important;
-    width:230px!important;
-    height:220px!important;
+    bottom:calc(var(--cs-joy-size) + 28px + var(--cs-safe-bottom))!important;
+    width:190px!important;
+    height:166px!important;
     transform:none!important;
     display:block!important;
     z-index:35!important;
@@ -347,47 +432,71 @@ body.cs-touch-playing{overscroll-behavior:none}
   }
   body.cs-touch-playing #skillBar .skill-icon{
     position:absolute!important;
-    width:56px!important;
-    height:56px!important;
-    border-radius:18px!important;
+    width:var(--cs-skill-size)!important;
+    height:var(--cs-skill-size)!important;
+    border-radius:14px!important;
     pointer-events:auto!important;
-    background:rgba(5,8,20,.80)!important;
-    border:1px solid rgba(130,210,255,.36)!important;
-    box-shadow:0 0 22px rgba(97,218,251,.18),inset 0 0 16px rgba(255,255,255,.045)!important;
-    backdrop-filter:blur(10px);
-    -webkit-backdrop-filter:blur(10px);
+    background:rgba(5,8,20,.78)!important;
+    border:1px solid rgba(130,210,255,.32)!important;
+    box-shadow:0 0 17px rgba(97,218,251,.15),inset 0 0 12px rgba(255,255,255,.04)!important;
+    backdrop-filter:blur(8px);
+    -webkit-backdrop-filter:blur(8px);
+    font-size:clamp(18px,3.2vmin,22px)!important;
   }
   body.cs-touch-playing #skillBar .skill-icon:active{transform:scale(.94);filter:brightness(1.18)}
-  body.cs-touch-playing #skillBar .skill-icon:nth-child(1){right:154px!important;bottom:34px!important}
-  body.cs-touch-playing #skillBar .skill-icon:nth-child(2){right:128px!important;bottom:98px!important}
-  body.cs-touch-playing #skillBar .skill-icon:nth-child(3){right:70px!important;bottom:140px!important}
+  body.cs-touch-playing #skillBar .skill-icon:nth-child(1){right:126px!important;bottom:20px!important}
+  body.cs-touch-playing #skillBar .skill-icon:nth-child(2){right:104px!important;bottom:72px!important}
+  body.cs-touch-playing #skillBar .skill-icon:nth-child(3){right:58px!important;bottom:106px!important}
   body.cs-touch-playing #skillBar .skill-icon:nth-child(4),
-  body.cs-touch-playing #skillBar #ultimateIcon{right:10px!important;bottom:125px!important}
+  body.cs-touch-playing #skillBar #ultimateIcon{right:10px!important;bottom:96px!important}
+  body.cs-touch-playing #skillBar .cd-overlay{font-size:9px!important}
   body.cs-touch-playing #skillBar .key-hint{
-    bottom:3px!important;
-    right:5px!important;
+    bottom:2px!important;
+    right:4px!important;
     left:auto!important;
-    font-size:9px!important;
-    color:rgba(255,255,255,.76)!important;
+    font-size:8px!important;
+    color:rgba(255,255,255,.74)!important;
   }
-  body.cs-touch-playing .weapon-return-wrap{display:none!important}
 }
+
+@media (hover:none) and (pointer:coarse) and (max-height:430px){
+  :root{
+    --cs-joy-size:clamp(86px,14vmin,98px);
+    --cs-skill-size:42px;
+    --cs-dash-size:44px;
+  }
+  .left-panel,.right-panel{transform:scale(.66)}
+  .stats{min-width:205px!important;padding:6px 8px!important}
+  .scoreboard{min-width:145px!important;padding:6px 8px!important;font-size:9px!important}
+  .card{padding:9px!important;width:min(97vw,780px)!important}
+  .card h1{font-size:clamp(19px,4vw,26px)!important}
+  .card p{font-size:10.5px!important;line-height:1.34!important}
+  .pick-grid,.shop-grid,.upgrade-grid,.relic-grid{grid-template-columns:repeat(auto-fit,minmax(135px,1fr))!important;gap:6px!important}
+  .pick-btn,.shop-btn,.upgrade-btn,.relic-btn{padding:8px!important}
+  body.cs-touch-playing #skillBar{width:174px!important;height:150px!important;bottom:calc(var(--cs-joy-size) + 20px + var(--cs-safe-bottom))!important}
+  body.cs-touch-playing #skillBar .skill-icon:nth-child(1){right:116px!important;bottom:18px!important}
+  body.cs-touch-playing #skillBar .skill-icon:nth-child(2){right:96px!important;bottom:64px!important}
+  body.cs-touch-playing #skillBar .skill-icon:nth-child(3){right:52px!important;bottom:92px!important}
+  body.cs-touch-playing #skillBar .skill-icon:nth-child(4),
+  body.cs-touch-playing #skillBar #ultimateIcon{right:8px!important;bottom:86px!important}
+}
+
 @media (max-width:720px) and (orientation:portrait){
   .cs-mobile-controls::after{
     content:'Gire o celular para jogar melhor';
     position:absolute;
     left:50%;
-    top:16px;
+    top:12px;
     transform:translateX(-50%);
-    padding:8px 13px;
+    padding:7px 12px;
     border-radius:999px;
     color:#dff6ff;
     font-weight:900;
-    font-size:12px;
-    letter-spacing:.06em;
+    font-size:11px;
+    letter-spacing:.05em;
     background:rgba(4,8,18,.78);
     border:1px solid rgba(97,218,251,.22);
-    box-shadow:0 0 20px rgba(97,218,251,.12);
+    box-shadow:0 0 18px rgba(97,218,251,.12);
     pointer-events:none;
     white-space:nowrap;
   }
@@ -19908,6 +20017,80 @@ function removeTickets(){try{$('#powerTickets544')?.remove();$('#powerTickets548
   .riftEmptyRepair591{padding:18px;border-radius:16px;border:1px dashed rgba(255,255,255,.16);background:rgba(0,0,0,.18);color:#9fb0d5;text-align:center;font-size:13px}
 </style>
 
+
+<!-- CHRONO SHARDS — compactação visual mobile: modelos, projéteis e efeitos menores -->
+<script id="chronoPwaMobileScalePatch">
+(() => {
+  if (window.__chronoPwaMobileScalePatch592) return;
+  window.__chronoPwaMobileScalePatch592 = true;
+
+  const isTouchLike = () => {
+    try { return matchMedia('(hover:none), (pointer:coarse)').matches || navigator.maxTouchPoints > 0; }
+    catch { return navigator.maxTouchPoints > 0; }
+  };
+  const arr = v => Array.isArray(v) ? v : [];
+  const markName = prop => `__csMobileScaled_${prop}`;
+
+  function scaleOnce(obj, prop, factor, min = 0){
+    if(!obj || !Number.isFinite(Number(obj[prop]))) return;
+    const mark = markName(prop);
+    if(obj[mark]) return;
+    obj[prop] = Math.max(min, Number(obj[prop]) * factor);
+    obj[mark] = true;
+  }
+
+  function scaleGroup(list, rules){
+    for(const obj of arr(list)){
+      if(!obj) continue;
+      for(const [prop, factor, min] of rules) scaleOnce(obj, prop, factor, min);
+    }
+  }
+
+  function compactGameVisuals(){
+    let active = false;
+    try { active = isTouchLike() && !!(game && game.running); } catch { active = false; }
+    document.body.classList.toggle('cs-mobile-scaled', active);
+    if(!active) return;
+
+    const g = game;
+    const p = g.player;
+    if(p){
+      scaleOnce(p, 'r', .86, 8);
+      if(Array.isArray(p.trail) && p.trail.length > 9) p.trail.length = 9;
+    }
+
+    for(const e of arr(g.enemies)){
+      const boss = e.type === 'boss' || e.bossType;
+      scaleOnce(e, 'r', boss ? .86 : .82, boss ? 28 : 5);
+      scaleOnce(e, 'w', .82, 8);
+      scaleOnce(e, 'h', .82, 8);
+      scaleOnce(e, 'size', .82, 5);
+    }
+
+    scaleGroup(g.bullets, [
+      ['r', .72, 2.5], ['size', .72, 2.5], ['width', .76, 2], ['height', .76, 2]
+    ]);
+    scaleGroup(g.enemyBullets, [
+      ['r', .74, 2.5], ['size', .74, 2.5], ['width', .76, 2], ['height', .76, 2]
+    ]);
+    scaleGroup(g.loot, [ ['r', .80, 5], ['size', .80, 5] ]);
+    scaleGroup(g.particles, [ ['size', .68, 1], ['r', .70, 1] ]);
+    scaleGroup(g.rings, [ ['maxR', .78, 18], ['width', .78, 1.5] ]);
+    scaleGroup(g.shockwaves, [ ['maxR', .78, 30], ['width', .78, 1.5] ]);
+    scaleGroup(g.hazards, [ ['r', .78, 20], ['width', .74, 6], ['size', .78, 8] ]);
+    scaleGroup(g.floatingTexts, [ ['size', .84, 9] ]);
+
+    // Limita tremor em telas pequenas para não atrapalhar a leitura.
+    if(Number.isFinite(Number(g.shake))) g.shake = Math.min(Number(g.shake), 14);
+  }
+
+  setInterval(() => { try { compactGameVisuals(); } catch {} }, 90);
+  window.addEventListener('resize', () => setTimeout(compactGameVisuals, 80));
+  window.addEventListener('orientationchange', () => setTimeout(compactGameVisuals, 250));
+  console.log('Chrono Shards PWA 5.9.2 — compactação mobile visual ativa');
+})();
+</script>
+
 <!-- CHRONO SHARDS — controles mobile integrados + Service Worker -->
 <script id="chronoPwaMobileControlsScript">
 (() => {
@@ -19954,7 +20137,8 @@ function removeTickets(){try{$('#powerTickets544')?.remove();$('#powerTickets548
     const joy = byId(joyId);
     const knob = joy && joy.querySelector('.cs-joy-knob');
     if(!knob) return;
-    const max = 36;
+    const cssTravel = getComputedStyle(joy).getPropertyValue('--cs-knob-travel').trim();
+    const max = Number.parseFloat(cssTravel) || 28;
     knob.style.transform = `translate(calc(-50% + ${x * max}px), calc(-50% + ${y * max}px))`;
   }
 
