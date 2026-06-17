@@ -448,6 +448,164 @@ body.cs-touch-playing,body.cs-mobile-scaled{overscroll-behavior:none}
     background:rgba(5,8,20,.78)!important;
     border:1px solid rgba(130,210,255,.32)!important;
     box-shadow:0 0 17px rgba(97,218,251,.15),inset 0 0 12px rgba(255,255,255,.04)!important;
+  }
+
+  #pauseBtn{
+    position:fixed;
+    top:14px;
+    right:14px;
+    z-index:100;
+    width:48px;
+    height:48px;
+    border-radius:12px;
+    border:1px solid rgba(97,218,251,0.3);
+    background:linear-gradient(135deg,rgba(8,11,26,0.92),rgba(14,8,30,0.92));
+    color:#e8f4ff;
+    font-size:20px;
+    font-weight:900;
+    cursor:pointer;
+    box-shadow:0 4px 16px rgba(0,0,0,0.5),0 0 20px rgba(97,218,251,0.15);
+    backdrop-filter:blur(12px);
+    -webkit-backdrop-filter:blur(12px);
+    transition:transform 0.15s,filter 0.15s,border-color 0.15s;
+    display:none;
+    align-items:center;
+    justify-content:center;
+  }
+  #pauseBtn:hover{
+    transform:scale(1.08);
+    filter:brightness(1.12);
+    border-color:rgba(97,218,251,0.6);
+  }
+  #pauseBtn:active{
+    transform:scale(0.96);
+  }
+  #pauseBtn.visible{
+    display:flex;
+  }
+
+  #pauseMenu{
+    position:fixed;
+    top:50%;
+    left:50%;
+    transform:translate(-50%,-50%) scale(0.9);
+    z-index:101;
+    background:linear-gradient(135deg,rgba(8,11,26,0.98),rgba(14,8,30,0.98));
+    border:1px solid rgba(97,218,251,0.25);
+    border-radius:24px;
+    padding:32px;
+    box-shadow:0 12px 48px rgba(0,0,0,0.7),0 0 40px rgba(97,218,251,0.2);
+    backdrop-filter:blur(16px);
+    -webkit-backdrop-filter:blur(16px);
+    text-align:center;
+    opacity:0;
+    visibility:hidden;
+    pointer-events:none;
+    transition:opacity 0.25s ease,transform 0.25s ease,visibility 0.25s ease;
+    max-width:min(90vw,420px);
+    width:100%;
+  }
+  #pauseMenu.visible{
+    opacity:1;
+    visibility:visible;
+    pointer-events:auto;
+    transform:translate(-50%,-50%) scale(1);
+  }
+  #pauseMenu h1{
+    font-family:'Orbitron',sans-serif;
+    font-size:32px;
+    font-weight:900;
+    letter-spacing:0.12em;
+    background:linear-gradient(135deg,#61dafb,#9f6cff);
+    -webkit-background-clip:text;
+    -webkit-text-fill-color:transparent;
+    margin:0 0 24px;
+  }
+  #pauseMenu p{
+    color:#b0c4e8;
+    font-size:14px;
+    margin:0 0 28px;
+    line-height:1.6;
+  }
+  .pause-buttons{
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+  }
+  .pause-btn{
+    border:none;
+    border-radius:999px;
+    padding:13px 28px;
+    font-family:'Rajdhani',sans-serif;
+    font-weight:900;
+    font-size:15px;
+    letter-spacing:0.06em;
+    cursor:pointer;
+    transition:transform 0.15s,filter 0.15s,box-shadow 0.15s;
+  }
+  #pauseResume{
+    background:linear-gradient(135deg,#61dafb,#7c8cff);
+    color:#06101d;
+    box-shadow:0 10px 28px rgba(97,218,251,0.25);
+  }
+  #pauseResume:hover{
+    transform:translateY(-2px);
+    filter:brightness(1.08);
+    box-shadow:0 12px 32px rgba(97,218,251,0.35);
+  }
+  #pauseExit{
+    background:linear-gradient(135deg,rgba(255,107,157,0.2),rgba(255,107,157,0.1));
+    color:#ff8fa3;
+    border:1px solid rgba(255,107,157,0.4);
+    box-shadow:0 6px 16px rgba(255,107,157,0.1);
+  }
+  #pauseExit:hover{
+    transform:translateY(-2px);
+    background:linear-gradient(135deg,rgba(255,107,157,0.3),rgba(255,107,157,0.2));
+    border-color:rgba(255,107,157,0.6);
+    filter:brightness(1.1);
+  }
+  #pauseOverlay{
+    position:fixed;
+    inset:0;
+    background:rgba(2,4,10,0.7);
+    backdrop-filter:blur(6px);
+    -webkit-backdrop-filter:blur(6px);
+    z-index:100;
+    opacity:0;
+    visibility:hidden;
+    transition:opacity 0.25s ease,visibility 0.25s ease;
+    pointer-events:none;
+  }
+  #pauseOverlay.visible{
+    opacity:1;
+    visibility:visible;
+    pointer-events:auto;
+  }
+  @media (max-width:600px){
+    #pauseBtn{
+      width:44px;
+      height:44px;
+      font-size:18px;
+      top:10px;
+      right:10px;
+    }
+    #pauseMenu{
+      padding:24px;
+    }
+    #pauseMenu h1{
+      font-size:24px;
+      margin-bottom:16px;
+    }
+    #pauseMenu p{
+      font-size:12px;
+      margin-bottom:20px;
+    }
+    .pause-btn{
+      padding:11px 20px;
+      font-size:13px;
+    }
+  }
     backdrop-filter:blur(8px);
     -webkit-backdrop-filter:blur(8px);
     font-size:clamp(18px,3.2vmin,22px)!important;
@@ -557,6 +715,20 @@ body.cs-touch-playing,body.cs-mobile-scaled{overscroll-behavior:none}
 </div>
 </div>
 <canvas height="780" id="game" width="1360"></canvas>
+<!-- PAUSE BUTTON -->
+<button id="pauseBtn" class="" title="Pausar jogo (ESC)" aria-label="Pausar">⏸</button>
+
+<!-- PAUSE MENU -->
+<div id="pauseOverlay"></div>
+<div id="pauseMenu">
+  <h1>PAUSADO</h1>
+  <p>O jogo foi pausado. Escolha uma opção:</p>
+  <div class="pause-buttons">
+    <button id="pauseResume" class="pause-btn">Voltar</button>
+    <button id="pauseExit" class="pause-btn">Sair para Menu</button>
+  </div>
+</div>
+
 <div class="weapon-return-wrap">
 <button class="mini-action-btn" id="returnWeaponBtn">↺ Arma Inicial</button>
 </div>
@@ -20590,16 +20762,114 @@ function removeTickets(){try{$('#powerTickets544')?.remove();$('#powerTickets548
   });
 
   /* ── Expõe função para o menu injetar o botão ── */
-  window.__csInstall = {
+    window.__csInstall = {
     hasPrompt : function(){ return !!_installPrompt; },
     trigger   : triggerInstall,
     showBtn   : showMenuInstallBtn,
     isInstalled: isInstalled
   };
-
 })();
 </script>
 
+<!-- PAUSE MENU LOGIC -->
+<script>
+(function(){
+  'use strict';
+
+  const pauseBtn = document.getElementById('pauseBtn');
+  const pauseMenu = document.getElementById('pauseMenu');
+  const pauseOverlay = document.getElementById('pauseOverlay');
+  const pauseResume = document.getElementById('pauseResume');
+  const pauseExit = document.getElementById('pauseExit');
+
+  let isPaused = false;
+  let wasRunning = false;
+
+  /* Mostrar o botão de pausa apenas quando o jogo está rodando */
+  function updatePauseButtonVisibility(){
+    if(game && game.running && !game.shopPending && !game.betweenWaves){
+      pauseBtn.classList.add('visible');
+    } else {
+      pauseBtn.classList.remove('visible');
+    }
+  }
+
+  /* Abrir o menu de pausa */
+  function openPauseMenu(){
+    if(!game || isPaused) return;
+    isPaused = true;
+    wasRunning = game.running;
+    game.running = false;
+    pauseMenu.classList.add('visible');
+    pauseOverlay.classList.add('visible');
+  }
+
+  /* Fechar o menu de pausa e retomar o jogo */
+  function resumeGame(){
+    if(!isPaused) return;
+    isPaused = false;
+    game.running = wasRunning;
+    pauseMenu.classList.remove('visible');
+    pauseOverlay.classList.remove('visible');
+  }
+
+  /* Sair para o menu principal */
+  function exitToMenu(){
+    isPaused = false;
+    pauseMenu.classList.remove('visible');
+    pauseOverlay.classList.remove('visible');
+    pauseBtn.classList.remove('visible');
+    /* Chamar a função de menu inicial (que foi redefinida várias vezes no arquivo) */
+    if(typeof window.openStartMenu === 'function'){
+      window.openStartMenu();
+    } else if(typeof openStartMenu461 === 'function'){
+      openStartMenu461();
+    }
+  }
+
+  /* Event listeners */
+  pauseBtn.addEventListener('click', openPauseMenu);
+  pauseResume.addEventListener('click', resumeGame);
+  pauseExit.addEventListener('click', exitToMenu);
+  pauseOverlay.addEventListener('click', resumeGame);
+
+  /* Tecla ESC para pausar/retomar */
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape' || e.key === 'Esc'){
+      e.preventDefault();
+      if(isPaused){
+        resumeGame();
+      } else if(game && game.running && !game.shopPending && !game.betweenWaves){
+        openPauseMenu();
+      }
+    }
+  });
+
+  /* Atualizar visibilidade do botão a cada frame */
+  const originalLoop = window.loop || (function(){
+    /* Se loop não estiver exposto, criar um observer */
+    return null;
+  })();
+
+  if(originalLoop){
+    window.loop = function(ts){
+      updatePauseButtonVisibility();
+      return originalLoop(ts);
+    };
+  } else {
+    /* Fallback: atualizar a cada 100ms */
+    setInterval(updatePauseButtonVisibility, 100);
+  }
+
+  /* Expor funções globalmente se necessário */
+  window.__pauseMenu = {
+    open: openPauseMenu,
+    resume: resumeGame,
+    exit: exitToMenu
+  };
+
+})();
+</script>
 
 </body>
 </html>
