@@ -668,6 +668,31 @@ body.cs-touch-playing,body.cs-mobile-scaled{overscroll-behavior:none}
     white-space:nowrap;
   }
 }
+
+  /* ── MOBILE UI CLEANUP ── */
+  .blur-bg, .joystick-bg, .controls-bg, .skill-bar-bg {
+    display: none !important;
+  }
+  
+  /* Garantir que skill-bar seja completamente transparente */
+  .skill-bar {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+  
+  /* Melhorar visibilidade dos botões individuais */
+  .skill-icon {
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+  
+  /* Remover fundo de qualquer container de controles */
+  .controls-container, .joystick-container {
+    background: transparent !important;
+    border: none !important;
+  }
+
 </style>
 
 </head>
@@ -2283,6 +2308,141 @@ function drawHints(){
   ctx.restore();
 }
 
+// ── CAMERA ZOOM SYSTEM (Mobile 7" Optimization) ──
+const cameraZoom = {
+  level: 0.65,  // Zoom out para mostrar mais mapa em 7 polegadas
+  targetLevel: 0.65,
+  smoothing: 0.08,
+  minZoom: 0.5,
+  maxZoom: 1.2,
+  
+  update(){
+    this.level += (this.targetLevel - this.level) * this.smoothing;
+  },
+  
+  apply(ctx, W, H){
+    const scale = this.level;
+    ctx.translate(W/2, H/2);
+    ctx.scale(scale, scale);
+    ctx.translate(-W/2, -H/2);
+  },
+  
+  reset(ctx, W, H){
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+  }
+};
+
+// Detectar se é mobile e ajustar zoom automaticamente
+function detectAndAdjustZoom(){
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  const screenDiagonal = Math.sqrt(window.innerWidth**2 + window.innerHeight**2) / window.devicePixelRatio;
+  
+  // Para telas de ~7 polegadas (1920x1080 em 16:9)
+  if(isMobile && screenDiagonal > 150){
+    cameraZoom.targetLevel = 0.62;  // Zoom out mais para telas maiores
+  } else if(isMobile && screenDiagonal > 120){
+    cameraZoom.targetLevel = 0.68;  // Zoom médio para 6-7 polegadas
+  } else if(isMobile){
+    cameraZoom.targetLevel = 0.75;  // Zoom normal para telas menores
+  }
+}
+
+detectAndAdjustZoom();
+window.addEventListener('resize', detectAndAdjustZoom);
+// ── GLOBAL SCALE MULTIPLIER (Mobile Optimization) ──
+const SCALE = {
+  player: 0.85,      // Personagem 15% menor
+  enemy: 0.80,       // Inimigos 20% menores
+  projectile: 0.75,  // Projéteis 25% menores
+  particle: 0.70,    // Partículas 30% menores
+  effect: 0.80,      // Efeitos 20% menores
+  hazard: 0.85,      // Obstáculos 15% menores
+  loot: 0.80         // Loot 20% menor
+};
+// ── OBJECT POOLING SYSTEM (Extreme Performance Optimization) ──
+const ObjectPool = {
+  pools: {
+    bullet: [],
+    particle: [],
+    enemyBullet: []
+  },
+  
+  init(){
+    // Pré-alocar objetos para evitar garbage collection durante o jogo
+    for(let i = 0; i < 200; i++) this.pools.bullet.push({});
+    for(let i = 0; i < 300; i++) this.pools.particle.push({});
+    for(let i = 0; i < 150; i++) this.pools.enemyBullet.push({});
+  },
+  
+  get(type){
+    const pool = this.pools[type];
+    return pool.length > 0 ? pool.pop() : {};
+  },
+  
+  return(type, obj){
+    if(this.pools[type].length < (type === 'bullet' ? 200 : type === 'particle' ? 300 : 150)){
+      this.pools[type].push(obj);
+    }
+  },
+  
+  getStats(){
+    return {
+      bulletAvailable: this.pools.bullet.length,
+      particleAvailable: this.pools.particle.length,
+      enemyBulletAvailable: this.pools.enemyBullet.length
+    };
+  }
+};
+
+ObjectPool.init();
+
+// Otimização: Limitar atualizações de HUD a cada 2 frames
+let hudUpdateCounter = 0;
+const HUD_UPDATE_INTERVAL = 2;
+
+function shouldUpdateHUD(){
+  hudUpdateCounter++;
+  if(hudUpdateCounter >= HUD_UPDATE_INTERVAL){
+    hudUpdateCounter = 0;
+    return true;
+  }
+  return false;
+}
+
+// Otimização: Usar requestIdleCallback para tarefas não-críticas
+function scheduleIdleTask(fn){
+  if('requestIdleCallback' in window){
+    requestIdleCallback(fn, {timeout: 100});
+  } else {
+    setTimeout(fn, 16);
+  }
+}
+
+// Reduzir frequência de cálculos de colisão em mobile
+const collisionOptimization = {
+  checkInterval: 2,
+  counter: 0,
+  shouldCheck(){
+    this.counter++;
+    if(this.counter >= this.checkInterval){
+      this.counter = 0;
+      return true;
+    }
+    return false;
+  }
+};
+
+// Desabilitar efeitos visuais menos importantes em mobile
+const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+const visualQuality = {
+  particleCount: isMobileDevice ? 0.6 : 1.0,
+  shadowQuality: isMobileDevice ? 0 : 1,
+  glowEffects: isMobileDevice ? 0.5 : 1.0,
+  antiAlias: isMobileDevice ? false : true
+};
+
+
+
 // ── RENDER ───────────────────────────────────────────────────────
 const textCache = {};
 function getCachedFont(size, family='Rajdhani'){
@@ -2293,6 +2453,8 @@ function getCachedFont(size, family='Rajdhani'){
 
 function render(){
   ctx.clearRect(0,0,W,H);
+  cameraZoom.update();
+  cameraZoom.apply(ctx, W, H);
   const sx=rand(-game.shake,game.shake),sy=rand(-game.shake,game.shake);
   ctx.save();ctx.translate(sx,sy);
 
@@ -2349,7 +2511,7 @@ function loop(ts){
     updateDrones(dt);
     updateWaveState();
     updateFX(dt);
-    if(game.running) updateHUD();
+    if(game.running && shouldUpdateHUD()) updateHUD();
   }
   render();
 }
@@ -20814,6 +20976,104 @@ function removeTickets(){try{$('#powerTickets544')?.remove();$('#powerTickets548
 })();
 </script>
 
+
+<!-- HUD EDITOR MODAL -->
+<div id="hudEditorOverlay" class="hidden">
+  <div id="hudEditorContainer">
+    <h1>CONFIGURAR BOTÕES</h1>
+    <p>Clique e arraste para mover seus botões. Clique duas vezes para redimensionar.</p>
+    <div id="hudEditorCanvas" style="position:relative;width:100%;height:100%;background:rgba(2,4,10,0.95);border:1px solid rgba(97,218,251,0.3);border-radius:12px;overflow:hidden;">
+      <!-- Botões serão renderizados aqui dinamicamente -->
+    </div>
+    <div id="hudEditorButtons">
+      <button id="hudEditorCancel" class="main-btn" style="background:linear-gradient(135deg,rgba(255,107,157,0.3),rgba(255,107,157,0.2));color:#ff8fa3;">Cancelar</button>
+      <button id="hudEditorSave" class="main-btn" style="background:linear-gradient(135deg,#61dafb,#7c8cff);color:#06101d;">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<style>
+  #hudEditorOverlay{
+    position:fixed;
+    inset:0;
+    background:rgba(2,4,10,0.9);
+    backdrop-filter:blur(8px);
+    z-index:200;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+  }
+  #hudEditorOverlay.hidden{
+    display:none;
+  }
+  #hudEditorContainer{
+    background:linear-gradient(135deg,rgba(8,11,26,0.98),rgba(14,8,30,0.98));
+    border:1px solid rgba(97,218,251,0.25);
+    border-radius:20px;
+    padding:24px;
+    max-width:90vw;
+    width:100%;
+    max-height:90vh;
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+  }
+  #hudEditorContainer h1{
+    font-family:'Orbitron',sans-serif;
+    font-size:24px;
+    font-weight:900;
+    letter-spacing:0.12em;
+    background:linear-gradient(135deg,#61dafb,#9f6cff);
+    -webkit-background-clip:text;
+    -webkit-text-fill-color:transparent;
+    margin:0;
+  }
+  #hudEditorContainer p{
+    color:#b0c4e8;
+    font-size:12px;
+    margin:0;
+    line-height:1.4;
+  }
+  #hudEditorCanvas{
+    flex:1;
+    min-height:300px;
+  }
+  #hudEditorButtons{
+    display:flex;
+    gap:12px;
+    justify-content:center;
+  }
+  #hudEditorButtons .main-btn{
+    flex:1;
+    max-width:200px;
+  }
+  .hud-editor-button{
+    position:absolute;
+    cursor:grab;
+    border:2px dashed rgba(97,218,251,0.5);
+    border-radius:10px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:20px;
+    background:rgba(6,8,18,0.8);
+    transition:border-color 0.2s;
+    user-select:none;
+  }
+  .hud-editor-button:hover{
+    border-color:rgba(97,218,251,0.8);
+  }
+  .hud-editor-button.dragging{
+    border-color:#61dafb;
+    background:rgba(97,218,251,0.2);
+    cursor:grabbing;
+  }
+  .hud-editor-button.resizing{
+    border-color:#ffd700;
+  }
+</style>
+
 <!-- PAUSE MENU LOGIC -->
 <script>
 (function(){
@@ -20912,6 +21172,202 @@ function removeTickets(){try{$('#powerTickets544')?.remove();$('#powerTickets548
   };
 
 })();
+
+// ── HUD EDITOR SYSTEM ──
+(function(){
+  'use strict';
+  
+  const hudEditorOverlay = document.getElementById('hudEditorOverlay');
+  const hudEditorCanvas = document.getElementById('hudEditorCanvas');
+  const hudEditorCancel = document.getElementById('hudEditorCancel');
+  const hudEditorSave = document.getElementById('hudEditorSave');
+  
+  let hudLayout = {
+    skillIcon1: {x: 50, y: 80, w: 44, h: 44},
+    skillIcon2: {x: 110, y: 80, w: 44, h: 44},
+    skillIcon3: {x: 170, y: 80, w: 44, h: 44},
+    dashBtn: {x: 230, y: 80, w: 44, h: 44},
+    pauseBtn: {x: window.innerWidth - 60, y: 20, w: 40, h: 40}
+  };
+  
+  let tempLayout = JSON.parse(JSON.stringify(hudLayout));
+  let draggingButton = null;
+  let resizingButton = null;
+  let dragOffset = {x: 0, y: 0};
+  
+  // Carregar layout salvo do localStorage
+  function loadHudLayout(){
+    const saved = localStorage.getItem('chrono_hud_layout');
+    if(saved){
+      hudLayout = JSON.parse(saved);
+      tempLayout = JSON.parse(JSON.stringify(hudLayout));
+    }
+  }
+  
+  // Abrir editor de HUD
+  window.openHudEditor = function(){
+    tempLayout = JSON.parse(JSON.stringify(hudLayout));
+    hudEditorOverlay.classList.remove('hidden');
+    renderHudEditor();
+  };
+  
+  // Renderizar botões no editor
+  function renderHudEditor(){
+    hudEditorCanvas.innerHTML = '';
+    for(const [key, pos] of Object.entries(tempLayout)){
+      const btn = document.createElement('div');
+      btn.className = 'hud-editor-button';
+      btn.style.left = pos.x + 'px';
+      btn.style.top = pos.y + 'px';
+      btn.style.width = pos.w + 'px';
+      btn.style.height = pos.h + 'px';
+      btn.textContent = key === 'skillIcon1' ? '⚡' : key === 'skillIcon2' ? '🛡️' : key === 'skillIcon3' ? '🌀' : key === 'dashBtn' ? '💨' : '⏸';
+      btn.dataset.key = key;
+      
+      btn.addEventListener('mousedown', startDrag);
+      btn.addEventListener('dblclick', startResize);
+      
+      hudEditorCanvas.appendChild(btn);
+    }
+  }
+  
+  function startDrag(e){
+    if(e.button !== 0) return;
+    draggingButton = e.target.dataset.key;
+    const rect = e.target.getBoundingClientRect();
+    dragOffset.x = e.clientX - rect.left;
+    dragOffset.y = e.clientY - rect.top;
+    e.target.classList.add('dragging');
+    document.addEventListener('mousemove', doDrag);
+    document.addEventListener('mouseup', stopDrag);
+  }
+  
+  function doDrag(e){
+    if(!draggingButton) return;
+    const canvasRect = hudEditorCanvas.getBoundingClientRect();
+    let x = e.clientX - canvasRect.left - dragOffset.x;
+    let y = e.clientY - canvasRect.top - dragOffset.y;
+    
+    x = Math.max(0, Math.min(x, canvasRect.width - tempLayout[draggingButton].w));
+    y = Math.max(0, Math.min(y, canvasRect.height - tempLayout[draggingButton].h));
+    
+    tempLayout[draggingButton].x = x;
+    tempLayout[draggingButton].y = y;
+    renderHudEditor();
+  }
+  
+  function stopDrag(){
+    if(draggingButton){
+      document.querySelector(`[data-key="${draggingButton}"]`).classList.remove('dragging');
+    }
+    draggingButton = null;
+    document.removeEventListener('mousemove', doDrag);
+    document.removeEventListener('mouseup', stopDrag);
+  }
+  
+  function startResize(e){
+    resizingButton = e.target.dataset.key;
+    const initialW = tempLayout[resizingButton].w;
+    const initialH = tempLayout[resizingButton].h;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    
+    function doResize(e){
+      const deltaX = e.clientX - startX;
+      const deltaY = e.clientY - startY;
+      tempLayout[resizingButton].w = Math.max(30, initialW + deltaX);
+      tempLayout[resizingButton].h = Math.max(30, initialH + deltaY);
+      renderHudEditor();
+    }
+    
+    function stopResize(){
+      resizingButton = null;
+      document.removeEventListener('mousemove', doResize);
+      document.removeEventListener('mouseup', stopResize);
+    }
+    
+    document.addEventListener('mousemove', doResize);
+    document.addEventListener('mouseup', stopResize);
+  }
+  
+  hudEditorCancel.addEventListener('click', () => {
+    hudEditorOverlay.classList.add('hidden');
+  });
+  
+  hudEditorSave.addEventListener('click', () => {
+    hudLayout = JSON.parse(JSON.stringify(tempLayout));
+    localStorage.setItem('chrono_hud_layout', JSON.stringify(hudLayout));
+    hudEditorOverlay.classList.add('hidden');
+    // Aplicar novo layout aos botões em tempo real
+    applyHudLayout();
+  });
+  
+  function applyHudLayout(){
+    const skillIcon1 = document.getElementById('skillIcon1');
+    const skillIcon2 = document.getElementById('skillIcon2');
+    const skillIcon3 = document.getElementById('skillIcon3');
+    const pauseBtn = document.getElementById('pauseBtn');
+    
+    if(skillIcon1 && hudLayout.skillIcon1){
+      skillIcon1.style.position = 'fixed';
+      skillIcon1.style.left = hudLayout.skillIcon1.x + 'px';
+      skillIcon1.style.top = hudLayout.skillIcon1.y + 'px';
+      skillIcon1.style.width = hudLayout.skillIcon1.w + 'px';
+      skillIcon1.style.height = hudLayout.skillIcon1.h + 'px';
+    }
+    if(skillIcon2 && hudLayout.skillIcon2){
+      skillIcon2.style.position = 'fixed';
+      skillIcon2.style.left = hudLayout.skillIcon2.x + 'px';
+      skillIcon2.style.top = hudLayout.skillIcon2.y + 'px';
+      skillIcon2.style.width = hudLayout.skillIcon2.w + 'px';
+      skillIcon2.style.height = hudLayout.skillIcon2.h + 'px';
+    }
+    if(skillIcon3 && hudLayout.skillIcon3){
+      skillIcon3.style.position = 'fixed';
+      skillIcon3.style.left = hudLayout.skillIcon3.x + 'px';
+      skillIcon3.style.top = hudLayout.skillIcon3.y + 'px';
+      skillIcon3.style.width = hudLayout.skillIcon3.w + 'px';
+      skillIcon3.style.height = hudLayout.skillIcon3.h + 'px';
+    }
+    if(pauseBtn && hudLayout.pauseBtn){
+      pauseBtn.style.top = hudLayout.pauseBtn.y + 'px';
+      pauseBtn.style.right = (window.innerWidth - hudLayout.pauseBtn.x - hudLayout.pauseBtn.w) + 'px';
+    }
+  }
+  
+  loadHudLayout();
+  applyHudLayout();
+  window.addEventListener('resize', applyHudLayout);
+  
+  window.__hudEditor = {
+    open: () => window.openHudEditor(),
+    getLayout: () => hudLayout
+  };
+})();
+
+
+// Limpeza periódica de memória (a cada 30 segundos)
+setInterval(() => {
+  if(game && game.particles){
+    // Remover partículas mortas
+    game.particles = game.particles.filter(p => p.life > 0);
+  }
+  if(game && game.bullets){
+    // Remover projéteis fora da tela
+    game.bullets = game.bullets.filter(b => {
+      if(b.x < -100 || b.x > W+100 || b.y < -100 || b.y > H+100){
+        ObjectPool.return('bullet', b);
+        return false;
+      }
+      return true;
+    });
+  }
+}, 30000);
+
+// Otimização: Usar transform3d para melhor performance
+document.body.style.willChange = 'transform';
+canvas.style.willChange = 'transform';
+
 </script>
 
 </body>
