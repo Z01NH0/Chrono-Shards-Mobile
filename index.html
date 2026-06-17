@@ -21468,5 +21468,296 @@ canvas.style.willChange = 'transform';
 
 </script>
 
+
+<!-- ╔════════════════════════════════════════════════════════════════════╗ -->
+<!-- ║         GLOBAL MOBILE PATCH - FINAL OVERRIDE (v3.7+)              ║ -->
+<!-- ║  Sobrescreve todas as funções ativas para garantir aplicação      ║ -->
+<!-- ║  das mudanças mobile (Zoom, Escala, HUD Editor, Otimização)       ║ -->
+<!-- ╚════════════════════════════════════════════════════════════════════╝ -->
+
+<script>
+(function(){
+  'use strict';
+  console.log('[MOBILE PATCH] Iniciando Patch Global Mobile v3.7+');
+  
+  // ── CAMERA ZOOM SYSTEM ──
+  window.cameraZoom = window.cameraZoom || {
+    level: 0.65,
+    targetLevel: 0.65,
+    smoothing: 0.08,
+    update() { this.level += (this.targetLevel - this.level) * this.smoothing; },
+    apply(ctx, W, H) {
+      const scale = this.level;
+      ctx.translate(W/2, H/2);
+      ctx.scale(scale, scale);
+      ctx.translate(-W/2, -H/2);
+    },
+    reset(ctx) { ctx.setTransform(1, 0, 0, 1, 0, 0); }
+  };
+  
+  // ── SCALE MULTIPLIER ──
+  window.SCALE = window.SCALE || {
+    player: 0.85,
+    enemy: 0.80,
+    projectile: 0.75,
+    particle: 0.70,
+    effect: 0.80,
+    hazard: 0.85,
+    loot: 0.80
+  };
+  
+  // ── SOBRESCREVER A FUNÇÃO RENDER ──
+  const originalRender = window.render;
+  if(typeof originalRender === 'function'){
+    window.render = function(){
+      if(window.cameraZoom) window.cameraZoom.update();
+      if(window.cameraZoom && window.ctx && window.W && window.H){
+        window.cameraZoom.apply(window.ctx, window.W, window.H);
+      }
+      const result = originalRender.apply(this, arguments);
+      if(window.cameraZoom && window.ctx) window.cameraZoom.reset(window.ctx);
+      return result;
+    };
+    console.log('[MOBILE PATCH] Render function patched com Zoom');
+  }
+  
+  // ── SOBRESCREVER DRAWPLAYER PARA APLICAR ESCALA ──
+  const originalDrawPlayer = window.drawPlayer;
+  if(typeof originalDrawPlayer === 'function'){
+    window.drawPlayer = function(){
+      if(window.ctx && window.SCALE){
+        window.ctx.save();
+        window.ctx.scale(window.SCALE.player, window.SCALE.player);
+        const result = originalDrawPlayer.apply(this, arguments);
+        window.ctx.restore();
+        return result;
+      }
+      return originalDrawPlayer.apply(this, arguments);
+    };
+    console.log('[MOBILE PATCH] DrawPlayer patched com SCALE');
+  }
+  
+  // ── SOBRESCREVER DRAWENEMIES PARA APLICAR ESCALA ──
+  const originalDrawEnemies = window.drawEnemies;
+  if(typeof originalDrawEnemies === 'function'){
+    window.drawEnemies = function(){
+      if(window.ctx && window.SCALE){
+        window.ctx.save();
+        window.ctx.scale(window.SCALE.enemy, window.SCALE.enemy);
+        const result = originalDrawEnemies.apply(this, arguments);
+        window.ctx.restore();
+        return result;
+      }
+      return originalDrawEnemies.apply(this, arguments);
+    };
+    console.log('[MOBILE PATCH] DrawEnemies patched com SCALE');
+  }
+  
+  // ── HUD EDITOR SYSTEM ──
+  window.hudLayout = JSON.parse(localStorage.getItem('chrono_hud_layout') || '{}') || {
+    skillIcon1: {x: 50, y: 80, w: 44, h: 44},
+    skillIcon2: {x: 110, y: 80, w: 44, h: 44},
+    skillIcon3: {x: 170, y: 80, w: 44, h: 44},
+    pauseBtn: {x: window.innerWidth - 60, y: 20, w: 40, h: 40}
+  };
+  
+  window.openHudEditor = function(){
+    const overlay = document.getElementById('hudEditorOverlay') || createHudEditorModal();
+    overlay.classList.remove('hidden');
+    renderHudEditor();
+  };
+  
+  function createHudEditorModal(){
+    const div = document.createElement('div');
+    div.id = 'hudEditorOverlay';
+    div.innerHTML = `
+      <div id="hudEditorContainer">
+        <h1>CONFIGURAR BOTÕES</h1>
+        <p>Clique e arraste para mover seus botões. Clique duas vezes para redimensionar.</p>
+        <div id="hudEditorCanvas" style="position:relative;width:100%;height:400px;background:rgba(2,4,10,0.95);border:1px solid rgba(97,218,251,0.3);border-radius:12px;overflow:hidden;"></div>
+        <div id="hudEditorButtons" style="display:flex;gap:12px;justify-content:center;margin-top:16px;">
+          <button id="hudEditorCancel" class="main-btn" style="background:linear-gradient(135deg,rgba(255,107,157,0.3),rgba(255,107,157,0.2));color:#ff8fa3;">Cancelar</button>
+          <button id="hudEditorSave" class="main-btn" style="background:linear-gradient(135deg,#61dafb,#7c8cff);color:#06101d;">Salvar</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(div);
+    return div;
+  }
+  
+  function renderHudEditor(){
+    const canvas = document.getElementById('hudEditorCanvas');
+    if(!canvas) return;
+    canvas.innerHTML = '';
+    
+    for(const [key, pos] of Object.entries(window.hudLayout)){
+      const btn = document.createElement('div');
+      btn.style.cssText = `position:absolute;left:${pos.x}px;top:${pos.y}px;width:${pos.w}px;height:${pos.h}px;border:2px dashed rgba(97,218,251,0.5);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;background:rgba(6,8,18,0.8);cursor:grab;user-select:none;`;
+      btn.textContent = key === 'skillIcon1' ? '⚡' : key === 'skillIcon2' ? '🛡️' : key === 'skillIcon3' ? '🌀' : '⏸';
+      btn.dataset.key = key;
+      
+      btn.addEventListener('mousedown', (e) => startDrag(e, btn));
+      btn.addEventListener('dblclick', (e) => startResize(e, btn));
+      
+      canvas.appendChild(btn);
+    }
+    
+    document.getElementById('hudEditorCancel').onclick = () => {
+      document.getElementById('hudEditorOverlay').classList.add('hidden');
+    };
+    
+    document.getElementById('hudEditorSave').onclick = () => {
+      localStorage.setItem('chrono_hud_layout', JSON.stringify(window.hudLayout));
+      document.getElementById('hudEditorOverlay').classList.add('hidden');
+      applyHudLayout();
+    };
+  }
+  
+  function startDrag(e, btn){
+    if(e.button !== 0) return;
+    const key = btn.dataset.key;
+    const rect = btn.getBoundingClientRect();
+    const canvasRect = document.getElementById('hudEditorCanvas').getBoundingClientRect();
+    const offsetX = e.clientX - rect.left;
+    const offsetY = e.clientY - rect.top;
+    
+    function doDrag(e){
+      let x = e.clientX - canvasRect.left - offsetX;
+      let y = e.clientY - canvasRect.top - offsetY;
+      x = Math.max(0, Math.min(x, canvasRect.width - window.hudLayout[key].w));
+      y = Math.max(0, Math.min(y, canvasRect.height - window.hudLayout[key].h));
+      window.hudLayout[key].x = x;
+      window.hudLayout[key].y = y;
+      renderHudEditor();
+    }
+    
+    function stopDrag(){
+      document.removeEventListener('mousemove', doDrag);
+      document.removeEventListener('mouseup', stopDrag);
+    }
+    
+    document.addEventListener('mousemove', doDrag);
+    document.addEventListener('mouseup', stopDrag);
+  }
+  
+  function startResize(e, btn){
+    const key = btn.dataset.key;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const initialW = window.hudLayout[key].w;
+    const initialH = window.hudLayout[key].h;
+    
+    function doResize(e){
+      const deltaX = e.clientX - startX;
+      const deltaY = e.clientY - startY;
+      window.hudLayout[key].w = Math.max(30, initialW + deltaX);
+      window.hudLayout[key].h = Math.max(30, initialH + deltaY);
+      renderHudEditor();
+    }
+    
+    function stopResize(){
+      document.removeEventListener('mousemove', doResize);
+      document.removeEventListener('mouseup', stopResize);
+    }
+    
+    document.addEventListener('mousemove', doResize);
+    document.addEventListener('mouseup', stopResize);
+  }
+  
+  function applyHudLayout(){
+    const skillIcon1 = document.getElementById('skillIcon1');
+    const skillIcon2 = document.getElementById('skillIcon2');
+    const skillIcon3 = document.getElementById('skillIcon3');
+    const pauseBtn = document.getElementById('pauseBtn');
+    
+    if(skillIcon1 && window.hudLayout.skillIcon1){
+      Object.assign(skillIcon1.style, {
+        position: 'fixed',
+        left: window.hudLayout.skillIcon1.x + 'px',
+        top: window.hudLayout.skillIcon1.y + 'px',
+        width: window.hudLayout.skillIcon1.w + 'px',
+        height: window.hudLayout.skillIcon1.h + 'px'
+      });
+    }
+    if(skillIcon2 && window.hudLayout.skillIcon2){
+      Object.assign(skillIcon2.style, {
+        position: 'fixed',
+        left: window.hudLayout.skillIcon2.x + 'px',
+        top: window.hudLayout.skillIcon2.y + 'px',
+        width: window.hudLayout.skillIcon2.w + 'px',
+        height: window.hudLayout.skillIcon2.h + 'px'
+      });
+    }
+    if(skillIcon3 && window.hudLayout.skillIcon3){
+      Object.assign(skillIcon3.style, {
+        position: 'fixed',
+        left: window.hudLayout.skillIcon3.x + 'px',
+        top: window.hudLayout.skillIcon3.y + 'px',
+        width: window.hudLayout.skillIcon3.w + 'px',
+        height: window.hudLayout.skillIcon3.h + 'px'
+      });
+    }
+    if(pauseBtn && window.hudLayout.pauseBtn){
+      Object.assign(pauseBtn.style, {
+        top: window.hudLayout.pauseBtn.y + 'px',
+        right: (window.innerWidth - window.hudLayout.pauseBtn.x - window.hudLayout.pauseBtn.w) + 'px'
+      });
+    }
+  }
+  
+  applyHudLayout();
+  window.addEventListener('resize', applyHudLayout);
+  
+  // ── INJETAR BOTÃO NO MENU DE CONFIGURAÇÕES ──
+  const originalOpenSettings = window.openSettingsMenu37;
+  if(typeof originalOpenSettings === 'function'){
+    window.openSettingsMenu37 = function(){
+      const result = originalOpenSettings.apply(this, arguments);
+      setTimeout(() => {
+        const hudBtn = document.createElement('button');
+        hudBtn.id = 'hudEditorBtn37Mobile';
+        hudBtn.className = 'main-btn';
+        hudBtn.style.cssText = 'width:100%;background:linear-gradient(135deg,#9f6cff,#61dafb);color:#06101d;margin-top:12px;';
+        hudBtn.textContent = 'Abrir Editor de Botões';
+        
+        const cfgCard = document.createElement('div');
+        cfgCard.className = 'cfg-card37';
+        cfgCard.innerHTML = '<strong>🎮 PERSONALIZAR BOTÕES</strong><span>Ajuste a posição e tamanho dos seus controles mobile.</span>';
+        cfgCard.appendChild(hudBtn);
+        
+        const menuGrid = document.querySelector('.menu-grid37');
+        if(menuGrid) menuGrid.appendChild(cfgCard);
+        
+        hudBtn.onclick = () => {
+          document.getElementById('overlay').classList.add('hidden');
+          window.openHudEditor();
+        };
+      }, 100);
+      return result;
+    };
+    console.log('[MOBILE PATCH] openSettingsMenu37 patched com HUD Editor');
+  }
+  
+  // ── CSS MOBILE COM !IMPORTANT ──
+  const style = document.createElement('style');
+  style.textContent = `
+    .skill-bar { background:transparent!important; border:none!important; box-shadow:none!important; }
+    .skill-icon { background:rgba(6,8,18,0.7)!important; border:1px solid rgba(120,200,255,0.35)!important; }
+    .blur-bg, .controls-bg, .joystick-bg { display:none!important; }
+    #hudEditorOverlay { position:fixed!important; inset:0!important; background:rgba(2,4,10,0.9)!important; backdrop-filter:blur(8px)!important; z-index:999!important; display:flex!important; align-items:center!important; justify-content:center!important; padding:20px!important; }
+    #hudEditorOverlay.hidden { display:none!important; }
+    #hudEditorContainer { background:linear-gradient(135deg,rgba(8,11,26,0.98),rgba(14,8,30,0.98))!important; border:1px solid rgba(97,218,251,0.25)!important; border-radius:20px!important; padding:24px!important; max-width:90vw!important; width:100%!important; }
+    @media (max-width:768px) {
+      .card { width:min(96vw,100%)!important; padding:clamp(12px,3vw,18px)!important; }
+      .card h1 { font-size:clamp(20px,5vw,28px)!important; }
+    }
+  `;
+  document.head.appendChild(style);
+  console.log('[MOBILE PATCH] CSS mobile aplicado com !important');
+  
+  console.log('[MOBILE PATCH] ✓ Patch Global Mobile v3.7+ Completo');
+})();
+</script>
+
 </body>
 </html>
