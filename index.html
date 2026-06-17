@@ -248,11 +248,11 @@ button:hover{transform:translateY(-2px) scale(1.015);filter:brightness(1.08)}
   --cs-safe-bottom:env(safe-area-inset-bottom,0px);
   --cs-safe-left:env(safe-area-inset-left,0px);
   --cs-safe-right:env(safe-area-inset-right,0px);
-  --cs-joy-size:clamp(94px,15vmin,112px);
-  --cs-joy-knob:calc(var(--cs-joy-size) * .42);
-  --cs-knob-travel:calc(var(--cs-joy-size) * .25);
-  --cs-skill-size:clamp(42px,7.2vmin,48px);
-  --cs-dash-size:clamp(46px,7.7vmin,52px);
+  --cs-joy-size:clamp(80px,12vmin,100px);
+  --cs-joy-knob:calc(var(--cs-joy-size) * .40);
+  --cs-knob-travel:calc(var(--cs-joy-size) * .22);
+  --cs-skill-size:clamp(36px,6vmin,42px);
+  --cs-dash-size:clamp(40px,6.5vmin,46px);
 }
 canvas#game,.cs-mobile-controls,.cs-mobile-controls *{
   touch-action:none;
@@ -584,11 +584,11 @@ body.cs-touch-playing,body.cs-mobile-scaled{overscroll-behavior:none}
   }
   @media (max-width:600px){
     #pauseBtn{
-      width:44px;
-      height:44px;
-      font-size:18px;
-      top:10px;
-      right:10px;
+      width:40px;
+      height:40px;
+      font-size:16px;
+      top:8px;
+      right:8px;
     }
     #pauseMenu{
       padding:24px;
@@ -782,7 +782,32 @@ const weaponLabel = document.getElementById('weaponLabel');
 const returnWeaponBtn = document.getElementById('returnWeaponBtn');
 const skillBar = document.getElementById('skillBar');
 
-const W = canvas.width, H = canvas.height;
+/* ── RESPONSIVE CANVAS SCALING ── */
+function resizeCanvasForDevice(){
+  const dpr = window.devicePixelRatio || 1;
+  const maxWidth = window.innerWidth * 0.98;
+  const maxHeight = window.innerHeight * 0.75;
+  const aspectRatio = 1360 / 780;
+  let w, h;
+  if(maxWidth / maxHeight > aspectRatio){
+    h = maxHeight;
+    w = h * aspectRatio;
+  } else {
+    w = maxWidth;
+    h = w / aspectRatio;
+  }
+  canvas.width = Math.floor(w * dpr);
+  canvas.height = Math.floor(h * dpr);
+  canvas.style.width = Math.floor(w) + 'px';
+  canvas.style.height = Math.floor(h) + 'px';
+  ctx.scale(dpr, dpr);
+}
+resizeCanvasForDevice();
+window.addEventListener('resize', resizeCanvasForDevice);
+window.addEventListener('orientationchange', () => setTimeout(resizeCanvasForDevice, 100));
+
+const W = canvas.width / (window.devicePixelRatio || 1);
+const H = canvas.height / (window.devicePixelRatio || 1);
 const keys = {};
 const mouse = {x:W/2, y:H/2, down:false};
 let game = null, last = 0;
@@ -2259,6 +2284,13 @@ function drawHints(){
 }
 
 // ── RENDER ───────────────────────────────────────────────────────
+const textCache = {};
+function getCachedFont(size, family='Rajdhani'){
+  const key = size + family;
+  if(!textCache[key]) textCache[key] = `${size}px ${family}`;
+  return textCache[key];
+}
+
 function render(){
   ctx.clearRect(0,0,W,H);
   const sx=rand(-game.shake,game.shake),sy=rand(-game.shake,game.shake);
@@ -2317,10 +2349,21 @@ function loop(ts){
     updateDrones(dt);
     updateWaveState();
     updateFX(dt);
-    updateHUD();
+    if(game.running) updateHUD();
   }
   render();
 }
+
+/* Performance optimization: Limit particle count on mobile */
+function optimizeParticleCount(){
+  const isMobile = window.innerWidth < 1024;
+  const maxParticles = isMobile ? 150 : 300;
+  if(game && game.particles && game.particles.length > maxParticles){
+    game.particles = game.particles.slice(0, maxParticles);
+  }
+}
+
+setInterval(optimizeParticleCount, 500);
 
 
 // ── ECLIPSE UPDATE: CONTENT PATCH ───────────────────────────────
