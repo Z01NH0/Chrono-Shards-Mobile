@@ -12,6 +12,15 @@
 <meta name="color-scheme" content="dark">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="application-name" content="Chrono Shards">
+<meta name="description" content="Jogo de sobrevivência com hordas, habilidades únicas, bosses e progressão permanente. Jogue no navegador ou instale como app.">
+<!-- Open Graph / PWABuilder -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Chrono Shards">
+<meta property="og:description" content="Escolha sua classe, colete relíquias e sobreviva aos ecos que acordaram entre galáxias partidas.">
+<meta property="og:image" content="icons/icon-512.png">
+<meta property="og:url" content="https://chrono-shards-mobile.vercel.app/">
+<meta name="twitter:card" content="summary_large_image">
+<!-- Apple PWA -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Chrono Shards">
@@ -11037,7 +11046,7 @@ function killKey37(e){
   function setCard(){ensureStyle();ensureExtraStyle462();overlay.classList.remove('hidden');overlayCard.className='card dune461';}
   function rewardBurst(amount,label='RELÍQUIAS',color='#ffd166'){const div=document.createElement('div');div.className='rewardBurst461';div.style.background=`linear-gradient(135deg,${color},rgba(255,255,255,.96))`;div.textContent=(amount?`+${amount} `:'')+label;document.body.appendChild(div);setTimeout(()=>div.remove(),1200);}
 
-  function openStartMenu461(){game=null;mouse.down=false;setCard();const m=meta();overlayCard.innerHTML=`<div class="startStage461"><div class="startInner461"><div class="duneTop461"><div class="duneUpdate461">RIFT UPDATE</div><div class="duneTitle461">CHRONO<br>SHARDS</div></div><p class="duneSub461">As Fissuras Chrono abriram novas rotas, criaturas e poderes refletidos. Escolha sua classe, colete relíquias, recupere ${CHRONO} Fragmentos Chrono e sobreviva aos ecos que acordaram entre galáxias partidas.</p><div class="duneStats461" style="grid-template-columns:repeat(3,1fr)"><div class="duneStat461"><small>HIGH SCORE</small><b>${fmt(m.highScore)}</b></div><div class="duneStat461"><small>RELÍQUIAS</small><b>${fmt(m.relicShards)}</b></div><div class="duneStat461"><small>${CHRONO} FRAGMENTOS</small><b>${fmt(m.chronoFragments)}</b></div></div><div class="startButtonsMain462"><button class="duneBtn461" id="play461">JOGAR</button><button class="duneBtn461 blue" id="hub461">CONQUISTAS & MISSÕES</button><button class="duneBtn461 purple" id="cfg461">CONFIGURAÇÕES</button></div><div class="startTutorial462"><button class="duneBtn461 dark" id="tutorial461">TUTORIAL</button></div></div></div>`;document.getElementById('play461').onclick=openClassMenu461;document.getElementById('hub461').onclick=openHub461;document.getElementById('tutorial461').onclick=openTutorial461;document.getElementById('cfg461').onclick=openSettings461;}
+  function openStartMenu461(){game=null;mouse.down=false;setCard();const m=meta();const _csInst=window.__csInstall;const _csShowInstall=_csInst&&!_csInst.isInstalled()&&_csInst.hasPrompt();overlayCard.innerHTML=`<div class="startStage461"><div class="startInner461"><div class="duneTop461"><div class="duneUpdate461">RIFT UPDATE</div><div class="duneTitle461">CHRONO<br>SHARDS</div></div><p class="duneSub461">As Fissuras Chrono abriram novas rotas, criaturas e poderes refletidos. Escolha sua classe, colete relíquias, recupere ${CHRONO} Fragmentos Chrono e sobreviva aos ecos que acordaram entre galáxias partidas.</p><div class="duneStats461" style="grid-template-columns:repeat(3,1fr)"><div class="duneStat461"><small>HIGH SCORE</small><b>${fmt(m.highScore)}</b></div><div class="duneStat461"><small>RELÍQUIAS</small><b>${fmt(m.relicShards)}</b></div><div class="duneStat461"><small>${CHRONO} FRAGMENTOS</small><b>${fmt(m.chronoFragments)}</b></div></div><div class="startButtonsMain462"><button class="duneBtn461" id="play461">JOGAR</button><button class="duneBtn461 blue" id="hub461">CONQUISTAS & MISSÕES</button><button class="duneBtn461 purple" id="cfg461">CONFIGURAÇÕES</button></div>${_csShowInstall?`<div class="startInstall462"><button class="cs-install-menu-btn visible" id="cs-menu-install-btn" style="margin-top:10px">&#8681; Instalar App — Jogue Offline</button></div>`:''}<div class="startTutorial462"><button class="duneBtn461 dark" id="tutorial461">TUTORIAL</button></div></div></div>`;document.getElementById('play461').onclick=openClassMenu461;document.getElementById('hub461').onclick=openHub461;document.getElementById('tutorial461').onclick=openTutorial461;document.getElementById('cfg461').onclick=openSettings461;const _menuInstBtn=document.getElementById('cs-menu-install-btn');if(_menuInstBtn&&_csInst)_menuInstBtn.onclick=function(){_csInst.trigger();};window.__csOpenStartMenu=openStartMenu461;}
     function openTutorial461(){setCard();overlayCard.innerHTML=`<h1 style="text-align:center">TUTORIAL</h1><p class="duneSub461">Guia completo do jogo separado por categoria. Entenda o básico do jogo!</p><div class="duneGrid461"><div class="dunePanel461"><span class="badge461" style="--co:#61dafb">MOVIMENTAÇÃO E COMANDOS</span><strong>Controle da arena</strong><span><b>WASD/Setas</b> movem o seu personagem. <b>Mouse</b> mira. <b>Clicar e segurar</b> faz você atirar. <b>Shift</b> você utliza o dash. <b>Espaço</b> ativa modo câmera lenta, mas consume foco. <b>E/Q/R</b> usam habilidades conforme a classe, mas as habilidades também consumem foco. Classes especiais podem ter <b>X</b> como ultimate. <b>FOCO:</b> O foco é uma barrinha roxa que fica embaixo de seu personagem, ela funciona como uma stamina, usada para utilização de habilidades e câmera lenta</span></div><div class="dunePanel461"><span class="badge461" style="--co:#ffd166">MOEDAS E RECOMPENSAS</span><strong>Relíquias, ouro e ${CHRONO} Fragmentos Chrono</strong><span><b>Ouro</b> é um drop de monstros/bosses, que é utilizado somente para upgrades em uma loja que aparece após a derrota do boss de 5 em 5 waves. <b>Relíquias</b> vêm de códigos, missões, bosses, monstros e recompensas do bestiário. Ela é a moeda principal do jogo, servindo para compra de personagens e buffs permanentes. <b>${CHRONO} Fragmentos Chrono</b> são raros: aparecem em bosses, bosses raros e eventos especiais. Atualmente esses fragmentos servem somente para liberar um personagem muito forte. <b>Chaves de Awakening</b> são drop de bosses, mais comuns do que os fragmento, essas chaves servem especialmente para liberar as missões de awakening de personagens no menu de missões.</span></div><div class="dunePanel461"><span class="badge461" style="--co:#c6a0ff">PROGRESSÃO</span><strong>Waves, bosses e níveis</strong><span>Seu objetivo aqui é sobreviver e ir cada vez mais adiante nas waves, com cada wave seguinte sendo mais dificil. A partir das waves avançadas surgem, bosses raros e recompensas maiores. <b>Nível:</b> Durante a partida, você irá ganhar XP, com esse XP acontecerá um upgrade de nível no meio da partida, podendo escolher entre 3 upgrades, mas se você morrer, vai começar tudo novamente. Existem poderes míticos incríveis!</span></div></div><div class="duneActions461"><button class="duneBtn461 dark" id="tutBack461">← Início</button></div>`;document.getElementById('tutBack461').onclick=openStartMenu461;}
   function openSettings461(){setCard();const m=meta();overlayCard.innerHTML=`<h1 style="text-align:center">CONFIGURAÇÕES</h1><p class="duneSub461">Ajustes do jogo e área de códigos. Ative o modo leve se seu PC for uma batata.</p><div class="duneGrid461"><div class="dunePanel461 settingsLow462" id="lowBox461" style="border-color:${m.gfxLow?'#86ffb0':'rgba(255,255,255,.14)'}"><span class="badge461" style="--co:${m.gfxLow?'#86ffb0':'#ffd166'}">LOW GFX ${m.gfxLow?'ATIVO':'DESATIVADO'}</span><strong>Modo visual leve</strong><span>Simplifica projéteis, modelos e efeitos para deixar o jogo mais leve.</span><button class="lowSwitch462 ${m.gfxLow?'':'off'}" id="lowGfx461">${m.gfxLow?'Desativar Low GFX':'Ativar Low GFX'}</button></div><div class="dunePanel461 codeClean462"><span class="badge461" style="--co:#9f6cff">CÓDIGOS</span><strong>Resgate recompensas secretas</strong><span>Digite um código válido para receber uma recompensa. Cada código só pode ser usado uma vez.</span><div class="codeRow461"><input id="codeInput461" placeholder="Digite o código"><button class="duneBtn461" id="redeem461">Resgatar</button></div><div id="codeMsg461" style="margin-top:10px;color:#bcd6ff"></div></div></div><div class="duneActions461"><button class="duneBtn461 dark" id="cfgBack461">← Início</button></div>`;document.getElementById('cfgBack461').onclick=openStartMenu461;document.getElementById('lowGfx461').onclick=()=>{const mm=meta();mm.gfxLow=!mm.gfxLow;save(mm);openSettings461();};document.getElementById('redeem461').onclick=()=>{const raw=(document.getElementById('codeInput461').value||'').trim().toLowerCase();const msg=document.getElementById('codeMsg461');const used=usedCodes();if(!raw){msg.textContent='Digite um código.';return;}if(used.includes(raw)){msg.style.color='#ffd166';msg.textContent='Esse código já foi usado.';return;}if(raw==='chronocode'){addRelics(100);used.push(raw);saveCodes(used);msg.style.color='#86ffb0';msg.textContent='+100 relíquias recebidas!';rewardBurst(100,'RELÍQUIAS');return;}if(raw==='monsterhunter'){addRelics(250);used.push(raw);saveCodes(used);msg.style.color='#86ffb0';msg.textContent='+250 relíquias recebidas!';rewardBurst(250,'RELÍQUIAS');return;}if(raw==='fragchrono'){addChrono(7);used.push(raw);saveCodes(used);msg.style.color='#86ffb0';msg.textContent=`+7 ${CHRONO} Fragmentos Chrono!`;rewardBurst(7,`${CHRONO} FRAGMENTOS`,'#9be6ff');return;}msg.style.color='#ff8fa3';msg.textContent='Código inválido.';};}
     function openHub461(){setCard();const m=meta();overlayCard.innerHTML=`<h1 style="text-align:center">CONQUISTAS & MISSÕES</h1><p class="duneSub461">Área central da progressão fora da batalha, organizada apenas com loja, missões e bestiário.</p><div class="duneGrid461 hubThree462"><button class="dunePanel461" id="hubRelics461"><span class="badge461" style="--co:#ffd166">LOJA</span><strong>Relíquias</strong><span>Compre bônus permanentes e acompanhe suas moedas.</span><span class="small461">Disponível: ${m.relicShards} relíquias</span></button><button class="dunePanel461" id="hubMissions461"><span class="badge461" style="--co:#86ffb0">OBJETIVOS</span><strong>Missões</strong><span>Missões de várias dificuldades que te dão relíquias em troca. Além de missões de awakening, que dão ultimates para personagens específicos!</span></button><button class="dunePanel461" id="hubBestiary461"><span class="badge461" style="--co:#ff6b9d">ARQUIVO</span><strong>Bestiário</strong><span>Registros de tudo e todos os bixos que você mata, além de te dar recompensas ao completar os registros.</span></button></div><div class="duneActions461"><button class="duneBtn461 dark" id="hubBack461">← Início</button></div>`;document.getElementById('hubRelics461').onclick=openRelics461;document.getElementById('hubMissions461').onclick=openMissions461;document.getElementById('hubBestiary461').onclick=openBestiary461;document.getElementById('hubBack461').onclick=openStartMenu461;}
@@ -20329,6 +20338,7 @@ function removeTickets(){try{$('#powerTickets544')?.remove();$('#powerTickets548
     if(canvasEl) canvasEl.addEventListener('contextmenu', ev => ev.preventDefault());
   }
 
+  /* ── PWA SERVICE WORKER ── */
   function registerPwaServiceWorker(){
     if(!('serviceWorker' in navigator)) return;
     window.addEventListener('load', () => {
@@ -20356,6 +20366,240 @@ function removeTickets(){try{$('#powerTickets544')?.remove();$('#powerTickets548
   else boot();
 })();
 </script>
+
+<!-- ═══════════════════════════════════════════════════════════
+     CHRONO SHARDS — PWA INSTALL BANNER
+     Captura beforeinstallprompt e exibe botão de instalação
+     no menu inicial. Funciona no Chrome (Android/Desktop).
+     ═══════════════════════════════════════════════════════════ -->
+<style>
+  /* Banner de instalação flutuante */
+  #cs-install-banner {
+    display: none;
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9999;
+    background: linear-gradient(135deg, rgba(8,11,26,0.97), rgba(14,8,30,0.97));
+    border: 1px solid rgba(97,218,251,0.35);
+    border-radius: 20px;
+    padding: 14px 20px;
+    display: none;
+    align-items: center;
+    gap: 14px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.6), 0 0 30px rgba(97,218,251,0.12);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    max-width: min(92vw, 440px);
+    width: max-content;
+    animation: cs-banner-in 0.4s cubic-bezier(0.34,1.56,0.64,1) both;
+  }
+  @keyframes cs-banner-in {
+    from { opacity:0; transform: translateX(-50%) translateY(20px) scale(0.92); }
+    to   { opacity:1; transform: translateX(-50%) translateY(0)    scale(1);    }
+  }
+  #cs-install-banner .cs-banner-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    flex-shrink: 0;
+    object-fit: cover;
+  }
+  #cs-install-banner .cs-banner-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  #cs-install-banner .cs-banner-text strong {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    color: #e8f4ff;
+  }
+  #cs-install-banner .cs-banner-text span {
+    font-size: 11px;
+    color: rgba(176,196,232,0.8);
+    line-height: 1.3;
+  }
+  #cs-install-btn {
+    flex-shrink: 0;
+    border: none;
+    border-radius: 999px;
+    padding: 9px 18px;
+    background: linear-gradient(135deg, #61dafb, #9f6cff);
+    color: #06101d;
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 900;
+    font-size: 13px;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    box-shadow: 0 6px 20px rgba(97,218,251,0.3);
+    transition: transform 0.15s, filter 0.15s;
+    white-space: nowrap;
+  }
+  #cs-install-btn:hover { transform: translateY(-2px); filter: brightness(1.1); }
+  #cs-install-btn:active { transform: scale(0.96); }
+  #cs-install-dismiss {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    color: rgba(176,196,232,0.5);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 4px;
+    line-height: 1;
+    transition: color 0.15s;
+  }
+  #cs-install-dismiss:hover { color: rgba(176,196,232,0.9); }
+
+  /* Botão de instalação inline no menu inicial */
+  .cs-install-menu-btn {
+    display: none;
+    width: 100%;
+    border: none;
+    border-radius: 999px;
+    padding: 13px 28px;
+    background: linear-gradient(135deg, #61dafb, #9f6cff);
+    color: #06101d;
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 900;
+    font-size: 15px;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    box-shadow: 0 10px 28px rgba(97,218,251,0.25);
+    transition: transform 0.15s, filter 0.15s;
+    margin-top: 8px;
+  }
+  .cs-install-menu-btn:hover { transform: translateY(-2px); filter: brightness(1.08); }
+  .cs-install-menu-btn.visible { display: block; }
+
+  /* Ocultar banner quando já instalado */
+  @media (display-mode: standalone), (display-mode: fullscreen) {
+    #cs-install-banner { display: none !important; }
+    .cs-install-menu-btn { display: none !important; }
+  }
+</style>
+
+<!-- Banner flutuante de instalação -->
+<div id="cs-install-banner" role="dialog" aria-label="Instalar Chrono Shards">
+  <img class="cs-banner-icon" src="icons/icon-192.png" alt="Chrono Shards">
+  <div class="cs-banner-text">
+    <strong>INSTALAR CHRONO SHARDS</strong>
+    <span>Jogue offline, direto da tela inicial.</span>
+  </div>
+  <button id="cs-install-btn" aria-label="Instalar o aplicativo">&#8681; Instalar</button>
+  <button id="cs-install-dismiss" aria-label="Fechar">&#x2715;</button>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  /* ── Estado global do prompt de instalação ── */
+  var _installPrompt = null;
+  var _bannerShown   = false;
+  var _dismissed     = sessionStorage.getItem('cs-install-dismissed') === '1';
+
+  /* ── Detecta se já está rodando como PWA instalado ── */
+  function isInstalled(){
+    return (
+      window.matchMedia('(display-mode: standalone)').matches ||
+      window.matchMedia('(display-mode: fullscreen)').matches ||
+      window.navigator.standalone === true
+    );
+  }
+
+  /* ── Exibe o banner flutuante ── */
+  function showBanner(){
+    if(_dismissed || isInstalled()) return;
+    var banner = document.getElementById('cs-install-banner');
+    if(!banner) return;
+    banner.style.display = 'flex';
+    _bannerShown = true;
+  }
+
+  /* ── Oculta o banner ── */
+  function hideBanner(){
+    var banner = document.getElementById('cs-install-banner');
+    if(banner) banner.style.display = 'none';
+    _bannerShown = false;
+  }
+
+  /* ── Exibe o botão inline no menu inicial ── */
+  function showMenuInstallBtn(){
+    if(isInstalled()) return;
+    var btn = document.getElementById('cs-menu-install-btn');
+    if(btn) btn.classList.add('visible');
+  }
+
+  /* ── Aciona o prompt nativo do Chrome ── */
+  function triggerInstall(){
+    if(!_installPrompt) return;
+    _installPrompt.prompt();
+    _installPrompt.userChoice.then(function(result){
+      console.log('Chrono Shards PWA: escolha do usuário —', result.outcome);
+      if(result.outcome === 'accepted'){
+        hideBanner();
+        hideMenuInstallBtn();
+      }
+      _installPrompt = null;
+    });
+  }
+
+  /* ── Oculta botão inline do menu ── */
+  function hideMenuInstallBtn(){
+    var btn = document.getElementById('cs-menu-install-btn');
+    if(btn) btn.classList.remove('visible');
+  }
+
+  /* ── Captura o evento beforeinstallprompt ── */
+  window.addEventListener('beforeinstallprompt', function(e){
+    e.preventDefault();
+    _installPrompt = e;
+    console.log('Chrono Shards PWA: prompt de instalação capturado');
+
+    /* Mostra o banner após 2 s para não interromper o carregamento */
+    setTimeout(function(){
+      if(!_dismissed && !isInstalled()) showBanner();
+    }, 2000);
+
+    /* Torna o botão do menu visível se o menu já estiver aberto */
+    showMenuInstallBtn();
+  });
+
+  /* ── Quando o app é instalado com sucesso ── */
+  window.addEventListener('appinstalled', function(){
+    console.log('Chrono Shards PWA: aplicativo instalado com sucesso!');
+    hideBanner();
+    hideMenuInstallBtn();
+    _installPrompt = null;
+  });
+
+  /* ── Botão de instalação no banner ── */
+  document.addEventListener('DOMContentLoaded', function(){
+    var installBtn  = document.getElementById('cs-install-btn');
+    var dismissBtn  = document.getElementById('cs-install-dismiss');
+
+    if(installBtn)  installBtn.addEventListener('click', triggerInstall);
+    if(dismissBtn)  dismissBtn.addEventListener('click', function(){
+      hideBanner();
+      _dismissed = true;
+      sessionStorage.setItem('cs-install-dismissed', '1');
+    });
+  });
+
+  /* ── Expõe função para o menu injetar o botão ── */
+  window.__csInstall = {
+    hasPrompt : function(){ return !!_installPrompt; },
+    trigger   : triggerInstall,
+    showBtn   : showMenuInstallBtn,
+    isInstalled: isInstalled
+  };
+
+})();
+</script>
+
 
 </body>
 </html>
