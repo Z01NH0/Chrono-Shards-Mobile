@@ -2359,6 +2359,24 @@ const SCALE = {
   hazard: 0.85,      // Obstáculos 15% menores
   loot: 0.80         // Loot 20% menor
 };
+
+// ── APPLY SCALE MULTIPLIER TO ALL ENTITIES ──
+function applyScale(value, scaleType = 'player'){
+  return value * (SCALE[scaleType] || 1);
+}
+
+// Sobrescrever o raio dos objetos com escala aplicada
+const originalGameInit = window.resetGame;
+window.resetGame = function(){
+  if(originalGameInit) originalGameInit.apply(this, arguments);
+  // Aplicar escala aos inimigos quando forem criados
+  if(game && game.enemies){
+    for(let e of game.enemies){
+      e.r = (e.r || 0) * SCALE.enemy;
+    }
+  }
+};
+
 // ── OBJECT POOLING SYSTEM (Extreme Performance Optimization) ──
 const ObjectPool = {
   pools: {
@@ -3217,7 +3235,7 @@ function drawPlayer(){
   const blink=p.hurtCd>0 && Math.floor(game.time*28)%2===0;
   ctx.save();
   if(p.trail){for(let i=p.trail.length-1;i>=0;i--){const tr=p.trail[i];ctx.globalAlpha=(1-i/p.trail.length)*0.14*(cloaked?0.3:1);ctx.fillStyle=color;ctx.beginPath();ctx.arc(tr.x,tr.y,p.r*(1-i/p.trail.length)*0.85,0,Math.PI*2);ctx.fill();}}
-  ctx.globalAlpha=blink?0.28:(cloaked?0.30:1); ctx.translate(p.x,p.y);ctx.rotate(a);
+  ctx.globalAlpha=blink?0.28:(cloaked?0.30:1); ctx.translate(p.x,p.y);ctx.scale(SCALE.player,SCALE.player);ctx.rotate(a);
   if(p.shield>0){ctx.save();ctx.globalAlpha=(p.shield/p.maxShield)*0.38;ctx.strokeStyle='#4ce0b3';ctx.lineWidth=3;ctx.beginPath();ctx.arc(0,0,p.r+9,0,Math.PI*2);ctx.stroke();ctx.restore();}
   if(game.parryTimer>0){ctx.strokeStyle='#ffe38c';ctx.lineWidth=2.5;ctx.setLineDash([5,5]);ctx.beginPath();ctx.arc(0,0,p.r+18+Math.sin(game.time*10)*4,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);}
   if(game.overclockTimer>0){ctx.strokeStyle='#8ff8ff';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,p.r+13,0,Math.PI*2);ctx.stroke();}
@@ -3241,7 +3259,7 @@ function drawDrones(){
 
 function drawEnemies(){
   for(const e of game.enemies){
-    ctx.save();ctx.translate(e.x,e.y);const pulse=1+Math.sin(game.time*6+e.wobble)*0.06;ctx.scale(pulse,pulse);ctx.shadowBlur=e.type==='boss'?34:e.elite?24:18;ctx.shadowColor=e.color;const frozen=game.timeStopActive>0||e.frozenTime>0;const fill=e.hitFlash>0?'#fff':(frozen?'#a0d8ff':e.poison>0?'#b6ff7a':e.color);
+    ctx.save();ctx.translate(e.x,e.y);const pulse=1+Math.sin(game.time*6+e.wobble)*0.06;ctx.scale(pulse*SCALE.enemy,pulse*SCALE.enemy);ctx.shadowBlur=e.type==='boss'?34:e.elite?24:18;ctx.shadowColor=e.color;const frozen=game.timeStopActive>0||e.frozenTime>0;const fill=e.hitFlash>0?'#fff':(frozen?'#a0d8ff':e.poison>0?'#b6ff7a':e.color);
     if(e.type==='chaser'){ctx.beginPath();ctx.moveTo(0,-e.r);ctx.lineTo(e.r,0);ctx.lineTo(0,e.r);ctx.lineTo(-e.r,0);ctx.closePath();ctx.fillStyle=fill;ctx.fill();}
     if(e.type==='strafer'){ctx.beginPath();ctx.rect(-e.r,-e.r*0.8,e.r*2,e.r*1.6);ctx.fillStyle=fill;ctx.fill();ctx.fillStyle='#fff6dd';ctx.fillRect(-3,-e.r-5,6,9);}
     if(e.type==='tank'){ctx.beginPath();ctx.arc(0,0,e.r,0,Math.PI*2);ctx.fillStyle=fill;ctx.fill();ctx.strokeStyle='rgba(255,255,255,0.7)';ctx.lineWidth=3.5;ctx.beginPath();ctx.arc(0,0,e.r-5,0,Math.PI*2);ctx.stroke();}
@@ -9602,14 +9620,21 @@ function killKey37(e){
   function openSettingsMenu37(){
     const m=readMeta37();
     overlay.classList.remove('hidden'); overlayCard.className='card panel37';
-    overlayCard.innerHTML=`<h1>CONFIGURAÇÕES</h1><p>Controle o desempenho visual do jogo e resgate códigos.</p>
+    overlayCard.innerHTML=`<h1>CONFIGURAÇÕES</h1><p>Controle o desempenho visual do jogo, personalize seus botões e resgate códigos.</p>
       <div class="menu-grid37">
         <div class="cfg-card37 ${m.gfxLow?'toggle-on':''}" id="gfxToggle37"><strong>LOW GFX ${m.gfxLow?'• ATIVO':'• DESATIVADO'}</strong><span>Quando ativado, partículas, ataques, bosses e efeitos visuais ficam muito mais simples e leves. Ideal para runs mais lisas.</span><button class="main-btn" style="margin-top:12px">${m.gfxLow?'Desativar':'Ativar'}</button></div>
+        <div class="cfg-card37"><strong>🎮 PERSONALIZAR BOTÕES</strong><span>Ajuste a posição e tamanho dos seus controles mobile para máximo conforto.</span><button class="main-btn" id="hudEditorBtn37" style="margin-top:12px;background:linear-gradient(135deg,#9f6cff,#61dafb);color:#06101d">Abrir Editor</button></div>
         <div class="cfg-card37"><strong>CÓDIGOS</strong><span>Resgate recompensas especiais. Cada código funciona apenas uma vez por save.</span><div class="code-row37"><input id="code37" placeholder="Digite o código"><button class="main-btn" id="redeem37">Resgatar</button></div><div id="codeMsg37" style="margin-top:10px;color:#bcd6ff"></div></div>
       </div>
       <div style="display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin-top:18px"><button class="main-btn" id="backCfg37">← Voltar</button></div>`;
     document.getElementById('backCfg37').onclick=openStartMenu;
     document.getElementById('gfxToggle37').onclick=()=>{const mm=readMeta37();mm.gfxLow=!mm.gfxLow;writeMeta37(mm);openSettingsMenu37();};
+    document.getElementById('hudEditorBtn37').onclick=()=>{
+      if(typeof window.openHudEditor === 'function'){
+        overlay.classList.add('hidden');
+        window.openHudEditor();
+      }
+    };
     document.getElementById('redeem37').onclick=()=>{
       const rewards={chronocode:100,monsterhunter:250};
       const used=jget37(CODE_KEY_37,[]);
@@ -20856,6 +20881,79 @@ function removeTickets(){try{$('#powerTickets544')?.remove();$('#powerTickets548
     #cs-install-banner { display: none !important; }
     .cs-install-menu-btn { display: none !important; }
   }
+
+  /* ── FINAL MOBILE OPTIMIZATION (Priority Override) ── */
+  .skill-bar {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+  }
+  
+  .skill-icon {
+    background: rgba(6,8,18,0.7) !important;
+    border: 1px solid rgba(120,200,255,0.35) !important;
+    box-shadow: 0 4px 12px rgba(97,218,251,0.15) !important;
+    backdrop-filter: blur(4px) !important;
+    -webkit-backdrop-filter: blur(4px) !important;
+  }
+  
+  /* Remover qualquer fundo borrado de controles */
+  .blur-bg, .controls-bg, .joystick-bg, .skill-bar-bg {
+    display: none !important;
+  }
+  
+  /* Garantir que o HUD Editor seja visível */
+  #hudEditorOverlay {
+    z-index: 999 !important;
+  }
+  
+  /* Escalar menus para mobile com prioridade */
+  @media (max-width: 768px) {
+    .card {
+      width: min(96vw, 100%) !important;
+      max-height: calc(100dvh - 20px) !important;
+      padding: clamp(12px, 3vw, 18px) !important;
+      border-radius: 16px !important;
+      font-size: clamp(12px, 2.5vw, 14px) !important;
+    }
+    
+    .card h1 {
+      font-size: clamp(20px, 5vw, 28px) !important;
+      margin-bottom: 8px !important;
+    }
+    
+    .card h2 {
+      font-size: clamp(14px, 4vw, 18px) !important;
+    }
+    
+    .card p {
+      font-size: clamp(12px, 2.5vw, 14px) !important;
+      margin-bottom: 10px !important;
+    }
+    
+    .main-btn {
+      padding: 11px 20px !important;
+      font-size: 13px !important;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .card {
+      padding: 10px !important;
+    }
+    
+    .card h1 {
+      font-size: clamp(18px, 5vw, 24px) !important;
+      margin-bottom: 6px !important;
+    }
+    
+    .main-btn {
+      padding: 10px 16px !important;
+      font-size: 12px !important;
+    }
+  }
+
 </style>
 
 <!-- Banner flutuante de instalação -->
