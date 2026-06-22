@@ -7,7 +7,7 @@
 <title>CHRONO SHARDS — Eclipse Update</title>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&amp;family=Rajdhani:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
 <!-- CHRONO SHARDS — PWA HEAD -->
-<link rel="manifest" href="manifest.webmanifest">
+<link rel="manifest" href="manifest.webmanifest?v=1782124385434">
 <meta name="theme-color" content="#090d1f">
 <meta name="color-scheme" content="dark">
 <meta name="mobile-web-app-capable" content="yes">
@@ -24,6 +24,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Chrono Shards">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
@@ -22171,6 +22172,37 @@ canvas.style.willChange = 'transform';
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
 })();
+
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js?v=1782124385434', {updateViaCache: 'none'}).then(reg=>{
+    console.log('[Cache-Busting] Service Worker registrado com versão: 1782124385434');
+    
+    // Verificar atualizações a cada 10 segundos
+    setInterval(() => {
+      reg.update().then(() => {
+        console.log('[Cache-Busting] Verificação de atualização do SW realizada');
+      });
+    }, 10000);
+    
+    // Se houver um novo SW esperando, força a ativação
+    if(reg.waiting){
+      console.log('[Cache-Busting] Novo SW aguardando - forçando ativação');
+      reg.waiting.postMessage({type: 'SKIP_WAITING'});
+    }
+    
+    reg.onupdatefound = () => {
+      const newWorker = reg.installing;
+      newWorker.onstatechange = () => {
+        if(newWorker.state === 'installed' && navigator.serviceWorker.controller){
+          console.log('[Cache-Busting] Novo SW instalado - forçando ativação');
+          newWorker.postMessage({type: 'SKIP_WAITING'});
+        }
+      };
+    };
+  }).catch(err=>{
+    console.log('[Cache-Busting] Erro ao registrar SW:', err);
+  });
+}
 </script>
 
 
