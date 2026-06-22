@@ -38,6 +38,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:'Ra
 
 canvas#game{
   width:min(98vw,1320px);height:auto;aspect-ratio:1360/780;
+  max-width:100vw;max-height:100vh;
   border-radius:16px;border:1px solid rgba(120,200,255,0.15);
   background:transparent;
   box-shadow:0 0 80px rgba(80,140,255,0.12),inset 0 0 40px rgba(0,0,0,0.6);
@@ -45,8 +46,9 @@ canvas#game{
 }
 
 .hud{
-  position:absolute;top:12px;width:min(98vw,1320px);
-  display:flex;justify-content:space-between;gap:12px;
+  position:fixed;top:12px;left:50%;transform:translateX(-50%);
+  width:min(98vw,1320px);
+  display:none;justify-content:space-between;gap:12px;
   pointer-events:none;z-index:5
 }
 
@@ -93,8 +95,8 @@ canvas#game{
 }
 
 .skill-bar{
-  position:absolute;bottom:14px;left:50%;transform:translateX(-50%);
-  display:flex;gap:10px;z-index:5;pointer-events:none
+  position:fixed;bottom:14px;left:50%;transform:translateX(-50%);
+  display:none;gap:10px;z-index:5;pointer-events:none
 }
 
 .skill-icon{
@@ -127,7 +129,8 @@ canvas#game{
 .weapon-return-wrap{
   position:absolute;bottom:14px;
   right:max(1vw,calc((100vw - min(98vw,1320px))/2 + 10px));
-  z-index:6
+  z-index:6;
+  display:none
 }
 
 .overlay{
@@ -357,6 +360,8 @@ body.cs-touch-playing,body.cs-mobile-scaled{overscroll-behavior:none}
   }
   .hud{
     top:5px!important;
+    left:50%!important;
+    transform:translateX(-50%)!important;
     width:min(100vw,174.36dvh)!important;
     padding:0 6px!important;
     gap:4px!important;
@@ -810,9 +815,12 @@ const skillBar = document.getElementById('skillBar');
 
 /* ── RESPONSIVE CANVAS SCALING ── */
 function resizeCanvasForDevice(){
+  // Se o patch mobile v6.0 já está ativo, ele cuida do escalonamento
+  if(window.__chronoMobileFinalOverride600) return;
   const dpr = window.devicePixelRatio || 1;
-  const maxWidth = window.innerWidth * 0.98;
-  const maxHeight = window.innerHeight * 0.75;
+  const isMobile = window.matchMedia('(hover:none),(pointer:coarse)').matches || navigator.maxTouchPoints > 0;
+  const maxWidth = window.innerWidth * (isMobile ? 1.0 : 0.98);
+  const maxHeight = window.innerHeight * (isMobile ? 1.0 : 0.92);
   const aspectRatio = 1360 / 780;
   let w, h;
   if(maxWidth / maxHeight > aspectRatio){
@@ -1011,6 +1019,7 @@ function resetGame(classKey){
   game.loopHpSnapshot = game.player.hp;
   game.loopFocusSnapshot = game.player.focus;
   startNextWave();
+  showGameHUD();
   updateHUD();
 }
 
@@ -1023,6 +1032,27 @@ function applyMetaRelics(){
 function spawnInitialDroneIfNeeded(){
   if(!game.upgrades.droneUnlocked) return;
   game.drones.push({angle:0,dist:58,fireCd:0,x:0,y:0});
+}
+
+// ── HUD VISIBILITY ─────────────────────────────────────────────
+function showGameHUD(){
+  const hudEl = document.querySelector('.hud');
+  const sbEl = document.getElementById('skillBar');
+  const wrEl = document.querySelector('.weapon-return-wrap');
+  const isMobile = window.matchMedia('(hover:none),(pointer:coarse)').matches || navigator.maxTouchPoints > 0;
+  if(hudEl) hudEl.style.display = isMobile ? '' : 'flex'; // mobile: deixa CSS controlar via cs-touch-playing
+  if(sbEl) sbEl.style.display = isMobile ? '' : 'flex';   // mobile: deixa CSS controlar via cs-touch-playing
+  // weapon-return-wrap só em desktop
+  if(wrEl) wrEl.style.display = (!isMobile && window.innerWidth > 900) ? 'block' : 'none';
+}
+function hideGameHUD(){
+  const hudEl = document.querySelector('.hud');
+  const sbEl = document.getElementById('skillBar');
+  const wrEl = document.querySelector('.weapon-return-wrap');
+  const isMobile = window.matchMedia('(hover:none),(pointer:coarse)').matches || navigator.maxTouchPoints > 0;
+  if(hudEl) hudEl.style.display = 'none';
+  if(sbEl) sbEl.style.display = isMobile ? '' : 'none'; // mobile: remove inline para CSS controlar
+  if(wrEl) wrEl.style.display = 'none';
 }
 
 // ── HUD ─────────────────────────────────────────────────────────
@@ -1804,6 +1834,7 @@ function gainXP(amount){
 
 // ── MENUS ────────────────────────────────────────────────────────
 function openClassMenu(){
+  hideGameHUD();
   const meta=loadMeta();
   overlay.classList.remove('hidden');
   overlayCard.innerHTML=`
@@ -1938,6 +1969,7 @@ function openShopMenu(){
 
 function gameOver(){
   game.running=false;
+  hideGameHUD();
   if(game.score>game.meta.highScore){game.meta.highScore=game.score;saveMeta()}
   else saveMeta();
   overlay.classList.remove('hidden');
@@ -8599,7 +8631,7 @@ requestAnimationFrame(loop);
     ctx.restore();
   };
 
-  setTimeout(()=>{try{if(!game)openStartMenu();else updateHUD();}catch(e){console.error(PATCH,e)}},0);
+  setTimeout(()=>{try{if(!game){hideGameHUD();openStartMenu();}else{showGameHUD();updateHUD();}}catch(e){console.error(PATCH,e)}},0);
   console.log(PATCH+' carregado');
 })();
 </script>
@@ -11449,7 +11481,7 @@ function killKey37(e){
   function setCard(){ensureStyle();ensureExtraStyle462();overlay.classList.remove('hidden');overlayCard.className='card dune461';}
   function rewardBurst(amount,label='RELÍQUIAS',color='#ffd166'){const div=document.createElement('div');div.className='rewardBurst461';div.style.background=`linear-gradient(135deg,${color},rgba(255,255,255,.96))`;div.textContent=(amount?`+${amount} `:'')+label;document.body.appendChild(div);setTimeout(()=>div.remove(),1200);}
 
-  function openStartMenu461(){game=null;mouse.down=false;setCard();const m=meta();const _csInst=window.__csInstall;const _csShowInstall=_csInst&&!_csInst.isInstalled()&&_csInst.hasPrompt();overlayCard.innerHTML=`<div class="startStage461"><div class="startInner461"><div class="duneTop461"><div class="duneUpdate461">RIFT UPDATE</div><div class="duneTitle461">CHRONO<br>SHARDS</div></div><p class="duneSub461">As Fissuras Chrono abriram novas rotas, criaturas e poderes refletidos. Escolha sua classe, colete relíquias, recupere ${CHRONO} Fragmentos Chrono e sobreviva aos ecos que acordaram entre galáxias partidas.</p><div class="duneStats461" style="grid-template-columns:repeat(3,1fr)"><div class="duneStat461"><small>HIGH SCORE</small><b>${fmt(m.highScore)}</b></div><div class="duneStat461"><small>RELÍQUIAS</small><b>${fmt(m.relicShards)}</b></div><div class="duneStat461"><small>${CHRONO} FRAGMENTOS</small><b>${fmt(m.chronoFragments)}</b></div></div><div class="startButtonsMain462"><button class="duneBtn461" id="play461">JOGAR</button><button class="duneBtn461 blue" id="hub461">CONQUISTAS & MISSÕES</button><button class="duneBtn461 purple" id="cfg461">CONFIGURAÇÕES</button></div>${_csShowInstall?`<div class="startInstall462"><button class="cs-install-menu-btn visible" id="cs-menu-install-btn" style="margin-top:10px">&#8681; Instalar App — Jogue Offline</button></div>`:''}<div class="startTutorial462"><button class="duneBtn461 dark" id="tutorial461">TUTORIAL</button></div></div></div>`;document.getElementById('play461').onclick=openClassMenu461;document.getElementById('hub461').onclick=openHub461;document.getElementById('tutorial461').onclick=openTutorial461;document.getElementById('cfg461').onclick=openSettings461;const _menuInstBtn=document.getElementById('cs-menu-install-btn');if(_menuInstBtn&&_csInst)_menuInstBtn.onclick=function(){_csInst.trigger();};window.__csOpenStartMenu=openStartMenu461;}
+  function openStartMenu461(){hideGameHUD();game=null;mouse.down=false;setCard();const m=meta();const _csInst=window.__csInstall;const _csShowInstall=_csInst&&!_csInst.isInstalled()&&_csInst.hasPrompt();overlayCard.innerHTML=`<div class="startStage461"><div class="startInner461"><div class="duneTop461"><div class="duneUpdate461">RIFT UPDATE</div><div class="duneTitle461">CHRONO<br>SHARDS</div></div><p class="duneSub461">As Fissuras Chrono abriram novas rotas, criaturas e poderes refletidos. Escolha sua classe, colete relíquias, recupere ${CHRONO} Fragmentos Chrono e sobreviva aos ecos que acordaram entre galáxias partidas.</p><div class="duneStats461" style="grid-template-columns:repeat(3,1fr)"><div class="duneStat461"><small>HIGH SCORE</small><b>${fmt(m.highScore)}</b></div><div class="duneStat461"><small>RELÍQUIAS</small><b>${fmt(m.relicShards)}</b></div><div class="duneStat461"><small>${CHRONO} FRAGMENTOS</small><b>${fmt(m.chronoFragments)}</b></div></div><div class="startButtonsMain462"><button class="duneBtn461" id="play461">JOGAR</button><button class="duneBtn461 blue" id="hub461">CONQUISTAS & MISSÕES</button><button class="duneBtn461 purple" id="cfg461">CONFIGURAÇÕES</button></div>${_csShowInstall?`<div class="startInstall462"><button class="cs-install-menu-btn visible" id="cs-menu-install-btn" style="margin-top:10px">&#8681; Instalar App — Jogue Offline</button></div>`:''}<div class="startTutorial462"><button class="duneBtn461 dark" id="tutorial461">TUTORIAL</button></div></div></div>`;document.getElementById('play461').onclick=openClassMenu461;document.getElementById('hub461').onclick=openHub461;document.getElementById('tutorial461').onclick=openTutorial461;document.getElementById('cfg461').onclick=openSettings461;const _menuInstBtn=document.getElementById('cs-menu-install-btn');if(_menuInstBtn&&_csInst)_menuInstBtn.onclick=function(){_csInst.trigger();};window.__csOpenStartMenu=openStartMenu461;}
     function openTutorial461(){setCard();overlayCard.innerHTML=`<h1 style="text-align:center">TUTORIAL</h1><p class="duneSub461">Guia completo do jogo separado por categoria. Entenda o básico do jogo!</p><div class="duneGrid461"><div class="dunePanel461"><span class="badge461" style="--co:#61dafb">MOVIMENTAÇÃO E COMANDOS</span><strong>Controle da arena</strong><span><b>WASD/Setas</b> movem o seu personagem. <b>Mouse</b> mira. <b>Clicar e segurar</b> faz você atirar. <b>Shift</b> você utliza o dash. <b>Espaço</b> ativa modo câmera lenta, mas consume foco. <b>E/Q/R</b> usam habilidades conforme a classe, mas as habilidades também consumem foco. Classes especiais podem ter <b>X</b> como ultimate. <b>FOCO:</b> O foco é uma barrinha roxa que fica embaixo de seu personagem, ela funciona como uma stamina, usada para utilização de habilidades e câmera lenta</span></div><div class="dunePanel461"><span class="badge461" style="--co:#ffd166">MOEDAS E RECOMPENSAS</span><strong>Relíquias, ouro e ${CHRONO} Fragmentos Chrono</strong><span><b>Ouro</b> é um drop de monstros/bosses, que é utilizado somente para upgrades em uma loja que aparece após a derrota do boss de 5 em 5 waves. <b>Relíquias</b> vêm de códigos, missões, bosses, monstros e recompensas do bestiário. Ela é a moeda principal do jogo, servindo para compra de personagens e buffs permanentes. <b>${CHRONO} Fragmentos Chrono</b> são raros: aparecem em bosses, bosses raros e eventos especiais. Atualmente esses fragmentos servem somente para liberar um personagem muito forte. <b>Chaves de Awakening</b> são drop de bosses, mais comuns do que os fragmento, essas chaves servem especialmente para liberar as missões de awakening de personagens no menu de missões.</span></div><div class="dunePanel461"><span class="badge461" style="--co:#c6a0ff">PROGRESSÃO</span><strong>Waves, bosses e níveis</strong><span>Seu objetivo aqui é sobreviver e ir cada vez mais adiante nas waves, com cada wave seguinte sendo mais dificil. A partir das waves avançadas surgem, bosses raros e recompensas maiores. <b>Nível:</b> Durante a partida, você irá ganhar XP, com esse XP acontecerá um upgrade de nível no meio da partida, podendo escolher entre 3 upgrades, mas se você morrer, vai começar tudo novamente. Existem poderes míticos incríveis!</span></div></div><div class="duneActions461"><button class="duneBtn461 dark" id="tutBack461">← Início</button></div>`;document.getElementById('tutBack461').onclick=openStartMenu461;}
   function openSettings461(){setCard();const m=meta();overlayCard.innerHTML=`<h1 style="text-align:center">CONFIGURAÇÕES</h1><p class="duneSub461">Ajustes do jogo e área de códigos. Ative o modo leve se seu PC for uma batata.</p><div class="duneGrid461"><div class="dunePanel461 settingsLow462" id="lowBox461" style="border-color:${m.gfxLow?'#86ffb0':'rgba(255,255,255,.14)'}"><span class="badge461" style="--co:${m.gfxLow?'#86ffb0':'#ffd166'}">LOW GFX ${m.gfxLow?'ATIVO':'DESATIVADO'}</span><strong>Modo visual leve</strong><span>Simplifica projéteis, modelos e efeitos para deixar o jogo mais leve.</span><button class="lowSwitch462 ${m.gfxLow?'':'off'}" id="lowGfx461">${m.gfxLow?'Desativar Low GFX':'Ativar Low GFX'}</button></div><div class="dunePanel461 codeClean462"><span class="badge461" style="--co:#9f6cff">CÓDIGOS</span><strong>Resgate recompensas secretas</strong><span>Digite um código válido para receber uma recompensa. Cada código só pode ser usado uma vez.</span><div class="codeRow461"><input id="codeInput461" placeholder="Digite o código"><button class="duneBtn461" id="redeem461">Resgatar</button></div><div id="codeMsg461" style="margin-top:10px;color:#bcd6ff"></div></div></div><div class="duneActions461"><button class="duneBtn461 dark" id="cfgBack461">← Início</button></div>`;document.getElementById('cfgBack461').onclick=openStartMenu461;document.getElementById('lowGfx461').onclick=()=>{const mm=meta();mm.gfxLow=!mm.gfxLow;save(mm);openSettings461();};document.getElementById('redeem461').onclick=()=>{const raw=(document.getElementById('codeInput461').value||'').trim().toLowerCase();const msg=document.getElementById('codeMsg461');const used=usedCodes();if(!raw){msg.textContent='Digite um código.';return;}if(used.includes(raw)){msg.style.color='#ffd166';msg.textContent='Esse código já foi usado.';return;}if(raw==='chronocode'){addRelics(100);used.push(raw);saveCodes(used);msg.style.color='#86ffb0';msg.textContent='+100 relíquias recebidas!';rewardBurst(100,'RELÍQUIAS');return;}if(raw==='monsterhunter'){addRelics(250);used.push(raw);saveCodes(used);msg.style.color='#86ffb0';msg.textContent='+250 relíquias recebidas!';rewardBurst(250,'RELÍQUIAS');return;}if(raw==='fragchrono'){addChrono(7);used.push(raw);saveCodes(used);msg.style.color='#86ffb0';msg.textContent=`+7 ${CHRONO} Fragmentos Chrono!`;rewardBurst(7,`${CHRONO} FRAGMENTOS`,'#9be6ff');return;}msg.style.color='#ff8fa3';msg.textContent='Código inválido.';};}
     function openHub461(){setCard();const m=meta();overlayCard.innerHTML=`<h1 style="text-align:center">CONQUISTAS & MISSÕES</h1><p class="duneSub461">Área central da progressão fora da batalha, organizada apenas com loja, missões e bestiário.</p><div class="duneGrid461 hubThree462"><button class="dunePanel461" id="hubRelics461"><span class="badge461" style="--co:#ffd166">LOJA</span><strong>Relíquias</strong><span>Compre bônus permanentes e acompanhe suas moedas.</span><span class="small461">Disponível: ${m.relicShards} relíquias</span></button><button class="dunePanel461" id="hubMissions461"><span class="badge461" style="--co:#86ffb0">OBJETIVOS</span><strong>Missões</strong><span>Missões de várias dificuldades que te dão relíquias em troca. Além de missões de awakening, que dão ultimates para personagens específicos!</span></button><button class="dunePanel461" id="hubBestiary461"><span class="badge461" style="--co:#ff6b9d">ARQUIVO</span><strong>Bestiário</strong><span>Registros de tudo e todos os bixos que você mata, além de te dar recompensas ao completar os registros.</span></button></div><div class="duneActions461"><button class="duneBtn461 dark" id="hubBack461">← Início</button></div>`;document.getElementById('hubRelics461').onclick=openRelics461;document.getElementById('hubMissions461').onclick=openMissions461;document.getElementById('hubBestiary461').onclick=openBestiary461;document.getElementById('hubBack461').onclick=openStartMenu461;}
@@ -11603,7 +11635,7 @@ function killKey37(e){
   window.openMissions461=openMissions461;window.openRelics461=openRelics461;window.openSettings461=openSettings461;
   window.__openBestiaryLatest=openBestiary461;window.openBestiary37=openBestiary461;window.openBestiary38=openBestiary461;window.openBestiaryG=openBestiary461;window.openBestiaryI=openBestiary461;window.openBestiary452=openBestiary461;window.openBestiary455=openBestiary461;window.openBestiary460=openBestiary461;window.openBestiary461=openBestiary461;
   const mo=new MutationObserver(()=>{const map={hubRelics37:openRelics461,hubMissions37:openMissions461,hubBestiary37:openBestiary461,hubRelics40:openRelics461,hubMissions40:openMissions461,hubBestiary40:openBestiary461,toCfg37:openSettings461,toMis37:openMissions461,toRel37:openRelics461,cfgStart37:openSettings461,hubStart37:openHub461};for(const [id,fn] of Object.entries(map)){const b=document.getElementById(id);if(b&&!b.dataset.dune461){b.dataset.dune461='1';b.onclick=ev=>{ev?.preventDefault?.();ev?.stopPropagation?.();fn();};}}});mo.observe(document.body,{childList:true,subtree:true});
-  setTimeout(()=>{if(!game)openStartMenu461();},0);
+  setTimeout(()=>{if(!game){hideGameHUD();openStartMenu461();}},0);
   console.log(PATCH+' carregado');
 })();
 
@@ -16570,7 +16602,7 @@ function killKey37(e){
   function crossCfg(){const m=read();m.crosshair529=m.crosshair529||{color:'#ff3434',model:'comum'};return m.crosshair529;}
   function renderCrossSvg(model,color){const st=`stroke:${color};fill:none;stroke-width:5;stroke-linecap:round;filter:drop-shadow(0 0 7px ${color})`;if(model==='ponto')return `<svg class="crossSvg529" style="--co:${color}" viewBox="0 0 120 120"><circle cx="60" cy="60" r="8" fill="${color}"/><circle cx="60" cy="60" r="28" style="${st};opacity:.55"/></svg>`;if(model==='diamante')return `<svg class="crossSvg529" style="--co:${color}" viewBox="0 0 120 120"><path d="M60 18 L102 60 L60 102 L18 60 Z" style="${st}"/><path d="M60 43 L77 60 L60 77 L43 60 Z" style="${st};opacity:.7"/></svg>`;if(model==='duplo')return `<svg class="crossSvg529" style="--co:${color}" viewBox="0 0 120 120"><circle cx="60" cy="60" r="19" style="${st}"/><circle cx="60" cy="60" r="39" style="${st};opacity:.45"/><path d="M60 7v22M60 91v22M7 60h22M91 60h22" style="${st}"/></svg>`;if(model==='triangulo')return `<svg class="crossSvg529" style="--co:${color}" viewBox="0 0 120 120"><path d="M60 16 L104 92 L16 92 Z" style="${st}"/><circle cx="60" cy="67" r="7" fill="${color}"/></svg>`;return `<svg class="crossSvg529" style="--co:${color}" viewBox="0 0 120 120"><circle cx="60" cy="60" r="24" style="${st}"/><path d="M60 5v30M60 85v30M5 60h30M85 60h30" style="${st}"/></svg>`;}
   function openCrosshairConfig(){addStyle();const saved=crossCfg();let temp={color:saved.color,model:saved.model};overlay.classList.remove('hidden');overlayCard.className='card dune461 riftCfg529';function draw(){overlayCard.innerHTML=`<h1 style="text-align:center">CONFIGURE SUA MIRA</h1><p class="duneSub461">Escolha cor e modelo. Cancelar fecha sem salvar; Salvar grava sua mira para todas as runs.</p><div class="crossGrid529"><div><div class="dunePanel461"><span class="badge461" style="--co:#75d8ff">COR</span><strong>Paleta de cores</strong><div class="palette529">${CROSS_COLORS.map(c=>`<button class="swatch529" data-c529="${c}" style="--c:${c};outline:${c===temp.color?'3px solid #fff':'none'}"></button>`).join('')}</div></div><div class="dunePanel461" style="margin-top:12px"><span class="badge461" style="--co:#ffd166">MODELOS</span><strong>Modelos prontos</strong><div class="crossModels529">${CROSS_MODELS.map(m=>`<button class="crossModel529 ${m===temp.model?'active':''}" data-m529="${m}" style="--co:${temp.color}">${renderCrossSvg(m,temp.color)}<span>${m[0].toUpperCase()+m.slice(1)}</span></button>`).join('')}</div></div></div><div class="crossPreview529">${renderCrossSvg(temp.model,temp.color)}</div></div><div class="duneActions461"><button class="duneBtn461 dark" id="cancelCross529">Cancelar</button><button class="duneBtn461" id="saveCross529">Salvar</button></div>`;overlayCard.querySelectorAll('[data-c529]').forEach(b=>b.onclick=()=>{temp.color=b.dataset.c529;draw();});overlayCard.querySelectorAll('[data-m529]').forEach(b=>b.onclick=()=>{temp.model=b.dataset.m529;draw();});document.getElementById('cancelCross529').onclick=openSettings529;document.getElementById('saveCross529').onclick=()=>{const m=read();m.crosshair529=temp;write(m);openSettings529();};}draw();}
-  function openSettings529(){addStyle();const m=read();overlay.classList.remove('hidden');overlayCard.className='card dune461 riftCfg529';overlayCard.innerHTML=`<h1 style="text-align:center">CONFIGURAÇÕES</h1><p class="duneSub461">Ajustes do jogo, códigos e personalização visual.</p><div class="duneGrid461"><div class="dunePanel461 settingsLow462" style="border-color:${m.gfxLow?'#86ffb0':'rgba(255,255,255,.14)'}"><span class="badge461" style="--co:${m.gfxLow?'#86ffb0':'#ffd166'}">LOW GFX ${m.gfxLow?'ATIVO':'DESATIVADO'}</span><strong>Modo visual leve</strong><span>Simplifica projéteis, modelos e efeitos para deixar o jogo mais leve.</span><button class="lowSwitch462 ${m.gfxLow?'':'off'}" id="low529">${m.gfxLow?'Desativar Low GFX':'Ativar Low GFX'}</button></div><div class="dunePanel461"><span class="badge461" style="--co:#75d8ff">MIRA</span><strong>Configure sua mira</strong><span>Troque cor e modelo da mira do mouse.</span><button class="duneBtn461 blue" id="cross529" style="margin-top:12px">Configure sua mira</button></div><div class="dunePanel461 codeClean462"><span class="badge461" style="--co:#9f6cff">CÓDIGOS</span><strong>Resgate recompensas secretas</strong><span>Digite um código válido. Cada código só pode ser usado uma vez.</span><div class="codeRow461"><input id="codeInput529" placeholder="Digite o código"><button class="duneBtn461" id="redeem529">Resgatar</button></div><div id="codeMsg529" style="margin-top:10px;color:#bcd6ff"></div></div></div><div class="duneActions461"><button class="duneBtn461 dark" id="cfgBack529">← Início</button></div>`;document.getElementById('cfgBack529').onclick=()=>window.openStartMenu?.();document.getElementById('cross529').onclick=openCrosshairConfig;document.getElementById('low529').onclick=()=>{const mm=read();mm.gfxLow=!mm.gfxLow;write(mm);openSettings529();};document.getElementById('redeem529').onclick=()=>{const raw=(document.getElementById('codeInput529').value||'').trim().toLowerCase(),msg=document.getElementById('codeMsg529'),used=usedCodes();if(!raw){msg.textContent='Digite um código.';return;}if(used.includes(raw)){msg.style.color='#ffd166';msg.textContent='Esse código já foi usado.';return;}if(raw==='chronocode'){const mm=read();mm.relicShards+=100;write(mm);used.push(raw);saveCodes(used);msg.style.color='#86ffb0';msg.textContent='+100 relíquias recebidas!';return;}if(raw==='monsterhunter'){const mm=read();mm.relicShards+=250;write(mm);used.push(raw);saveCodes(used);msg.style.color='#86ffb0';msg.textContent='+250 relíquias recebidas!';return;}if(raw==='fragchrono'){const mm=read();mm.chronoFragments+=7;write(mm);used.push(raw);saveCodes(used);msg.style.color='#86ffb0';msg.textContent='+7 Fragmentos Chrono!';return;}if(raw==='allin'){allInUnlock();used.push(raw);saveCodes(used);msg.style.color='#86ffb0';msg.textContent='Tudo liberado.';return;}msg.style.color='#ff8fa3';msg.textContent='Código inválido.';};}
+  function openSettings529(){hideGameHUD();addStyle();const m=read();overlay.classList.remove('hidden');overlayCard.className='card dune461 riftCfg529';overlayCard.innerHTML=`<h1 style="text-align:center">CONFIGURAÇÕES</h1><p class="duneSub461">Ajustes do jogo, códigos e personalização visual.</p><div class="duneGrid461"><div class="dunePanel461 settingsLow462" style="border-color:${m.gfxLow?'#86ffb0':'rgba(255,255,255,.14)'}"><span class="badge461" style="--co:${m.gfxLow?'#86ffb0':'#ffd166'}">LOW GFX ${m.gfxLow?'ATIVO':'DESATIVADO'}</span><strong>Modo visual leve</strong><span>Simplifica projéteis, modelos e efeitos para deixar o jogo mais leve.</span><button class="lowSwitch462 ${m.gfxLow?'':'off'}" id="low529">${m.gfxLow?'Desativar Low GFX':'Ativar Low GFX'}</button></div><div class="dunePanel461"><span class="badge461" style="--co:#75d8ff">MIRA</span><strong>Configure sua mira</strong><span>Troque cor e modelo da mira do mouse.</span><button class="duneBtn461 blue" id="cross529" style="margin-top:12px">Configure sua mira</button></div><div class="dunePanel461 codeClean462"><span class="badge461" style="--co:#9f6cff">CÓDIGOS</span><strong>Resgate recompensas secretas</strong><span>Digite um código válido. Cada código só pode ser usado uma vez.</span><div class="codeRow461"><input id="codeInput529" placeholder="Digite o código"><button class="duneBtn461" id="redeem529">Resgatar</button></div><div id="codeMsg529" style="margin-top:10px;color:#bcd6ff"></div></div></div><div class="duneActions461"><button class="duneBtn461 dark" id="cfgBack529">← Início</button></div>`;document.getElementById('cfgBack529').onclick=()=>window.openStartMenu?.();document.getElementById('cross529').onclick=openCrosshairConfig;document.getElementById('low529').onclick=()=>{const mm=read();mm.gfxLow=!mm.gfxLow;write(mm);openSettings529();};document.getElementById('redeem529').onclick=()=>{const raw=(document.getElementById('codeInput529').value||'').trim().toLowerCase(),msg=document.getElementById('codeMsg529'),used=usedCodes();if(!raw){msg.textContent='Digite um código.';return;}if(used.includes(raw)){msg.style.color='#ffd166';msg.textContent='Esse código já foi usado.';return;}if(raw==='chronocode'){const mm=read();mm.relicShards+=100;write(mm);used.push(raw);saveCodes(used);msg.style.color='#86ffb0';msg.textContent='+100 relíquias recebidas!';return;}if(raw==='monsterhunter'){const mm=read();mm.relicShards+=250;write(mm);used.push(raw);saveCodes(used);msg.style.color='#86ffb0';msg.textContent='+250 relíquias recebidas!';return;}if(raw==='fragchrono'){const mm=read();mm.chronoFragments+=7;write(mm);used.push(raw);saveCodes(used);msg.style.color='#86ffb0';msg.textContent='+7 Fragmentos Chrono!';return;}if(raw==='allin'){allInUnlock();used.push(raw);saveCodes(used);msg.style.color='#86ffb0';msg.textContent='Tudo liberado.';return;}msg.style.color='#ff8fa3';msg.textContent='Código inválido.';};}
   window.addEventListener('click',ev=>{const b=ev.target.closest&&ev.target.closest('#cfg461,#classCfg461,#cfgStart37');if(b){ev.preventDefault();ev.stopPropagation();ev.stopImmediatePropagation();openSettings529();}},true);
   window.openSettings529=openSettings529;
 
@@ -20532,7 +20564,7 @@ function removeTickets(){try{$('#powerTickets544')?.remove();$('#powerTickets548
     const cs = getComputedStyle(o);
     return o.classList.contains('hidden') || cs.display === 'none' || cs.visibility === 'hidden';
   }
-  function canShowControls(){ return isTouchLike() && gameIsRunning() && overlayIsHidden(); }
+  function canShowControls(){ return isTouchLike() && gameIsRunning() && overlayIsHidden() && !document.getElementById('csButtonMapperOverlay')?.classList.contains('visible'); }
 
   function emitKey(key, down){
     const normalized = key.toLowerCase();
@@ -21303,10 +21335,16 @@ function removeTickets(){try{$('#powerTickets544')?.remove();$('#powerTickets548
     }
   }
   
-  // Abrir editor de HUD
+  // Abrir editor de HUD — redirecionado para o novo mapper do patch v6.0
   window.openHudEditor = function(){
+    // Se o novo mapper do patch v6.0 estiver disponível, usa ele
+    if(typeof window.openMobileButtonMapper === 'function'){
+      window.openMobileButtonMapper();
+      return;
+    }
+    // Fallback para o editor legado
     tempLayout = JSON.parse(JSON.stringify(hudLayout));
-    hudEditorOverlay.classList.remove('hidden');
+    if(hudEditorOverlay) hudEditorOverlay.classList.remove('hidden');
     renderHudEditor();
   };
   
@@ -21503,9 +21541,13 @@ canvas.style.willChange = 'transform';
     image-rendering:auto;touch-action:none!important;
   }
   body.cs-mobile-runtime .hud{
+    display:none!important;
     top:calc(5px + var(--cs-safe-top))!important;left:50%!important;transform:translateX(-50%)!important;
     width:min(100vw,calc(var(--cs-vh) * var(--cs-arena-aspect)))!important;
     padding:0 6px!important;gap:4px!important;z-index:25!important;
+  }
+  body.cs-touch-playing .hud{
+    display:flex!important;
   }
   body.cs-mobile-runtime .left-panel{transform:scale(.72)!important;transform-origin:top left!important;gap:4px!important;}
   body.cs-mobile-runtime .right-panel{transform:scale(.72)!important;transform-origin:top right!important;gap:4px!important;align-items:flex-end!important;}
@@ -21591,8 +21633,11 @@ canvas.style.willChange = 'transform';
   body.cs-mobile-runtime input,body.cs-mobile-runtime select,body.cs-mobile-runtime textarea{font-size:16px!important;}
 
   body.cs-mobile-runtime #skillBar{
-    position:fixed!important;inset:0!important;width:100vw!important;height:var(--cs-vh)!important;display:block!important;
+    position:fixed!important;inset:0!important;width:100vw!important;height:var(--cs-vh)!important;display:none!important;
     transform:none!important;background:transparent!important;border:none!important;box-shadow:none!important;pointer-events:none!important;z-index:45!important;
+  }
+  body.cs-touch-playing #skillBar{
+    display:block!important;
   }
   body.cs-mobile-runtime #skillBar .skill-icon{
     position:fixed!important;width:44px!important;height:44px!important;border-radius:14px!important;pointer-events:auto!important;
@@ -22048,7 +22093,17 @@ canvas.style.willChange = 'transform';
       btn.addEventListener('click', ev => { ev.preventDefault(); ev.stopPropagation(); try { byId('overlay')?.classList.add('hidden'); } catch {}; openButtonMapper(); }, true);
     });
   }
+  function isSettingsMenuOpen(){
+    const card = byId('overlayCard');
+    if (!card) return false;
+    const h = card.querySelector('h1');
+    if (!h) return false;
+    return /CONFIGURA/i.test(h.textContent || '');
+  }
+
   function injectMapperIntoSettings(){
+    // Só injeta se o menu de CONFIGURAÇÕES estiver aberto
+    if (!isSettingsMenuOpen()) return;
     const card = byId('overlayCard');
     if (!card) return;
     const crossBtn = byId('cross529');
@@ -22064,16 +22119,13 @@ canvas.style.willChange = 'transform';
       const codePanel = grid.querySelector('.codeClean462,.cfg-card37:last-child');
       if (codePanel) grid.insertBefore(panel, codePanel); else grid.appendChild(panel);
     }
-    const h = card.querySelector('h1');
-    if (h && /CONFIGURA/i.test(h.textContent || '')) {
-      card.querySelectorAll('.dunePanel461,.cfg-card37').forEach(p => {
-        const t = (p.textContent || '').toUpperCase();
-        if (t.includes('CONFIGURE SUA MIRA') || t.includes('MIRA')) {
-          const b = p.querySelector('#cross529,[data-open-crosshair]');
-          if (b) p.innerHTML = mapperPanelHtml();
-        }
-      });
-    }
+    card.querySelectorAll('.dunePanel461,.cfg-card37').forEach(p => {
+      const t = (p.textContent || '').toUpperCase();
+      if (t.includes('CONFIGURE SUA MIRA') || t.includes('MIRA')) {
+        const b = p.querySelector('#cross529,[data-open-crosshair]');
+        if (b) p.innerHTML = mapperPanelHtml();
+      }
+    });
     bindMapperButtons();
   }
   function wrapSettings(name){
