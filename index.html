@@ -3,46 +3,79 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" name="viewport"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <title>CHRONO SHARDS — Eclipse Update</title>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&amp;family=Rajdhani:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
-<!-- CHRONO SHARDS — PWA HEAD -->
-<link rel="manifest" href="manifest.webmanifest?v=1782124385434">
+<!-- CHRONO SHARDS — APP METADATA -->
+<!-- CORRIGIDO: Removidas metas de instalacao PWA para comportamento de APK nativo -->
 <meta name="theme-color" content="#090d1f">
 <meta name="color-scheme" content="dark">
-<meta name="mobile-web-app-capable" content="yes">
 <meta name="application-name" content="Chrono Shards">
-<meta name="description" content="Jogo de sobrevivência com hordas, habilidades únicas, bosses e progressão permanente. Jogue no navegador ou instale como app.">
-<!-- Open Graph / PWABuilder -->
-<meta property="og:type" content="website">
-<meta property="og:title" content="Chrono Shards">
-<meta property="og:description" content="Escolha sua classe, colete relíquias e sobreviva aos ecos que acordaram entre galáxias partidas.">
-<meta property="og:image" content="icons/icon-512.png">
-<meta property="og:url" content="https://chrono-shards-mobile.vercel.app/">
-<meta name="twitter:card" content="summary_large_image">
-<!-- Apple PWA -->
+<meta name="description" content="Jogo de sobrevivência com hordas, habilidades únicas, bosses e progressão permanente.">
+<!-- Apple fullscreen (sem instalar como app) -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Chrono Shards">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:'Rajdhani',sans-serif;color:#eef2ff}
+*{
+  box-sizing:border-box;margin:0;padding:0;
+  /* CORRIGIDO: Bloquear selecao de texto em todos os elementos */
+  -webkit-user-select:none;
+  -moz-user-select:none;
+  user-select:none;
+  /* Bloquear callout do iOS (long-press) */
+  -webkit-touch-callout:none;
+  /* Bloquear highlight de toque */
+  -webkit-tap-highlight-color:transparent;
+}
+html,body{
+  width:100%;height:100%;overflow:hidden;background:#000;
+  font-family:'Rajdhani',sans-serif;color:#eef2ff;
+  overscroll-behavior:none;
+  touch-action:none;
+  -webkit-text-size-adjust:none;
+  text-size-adjust:none;
+}
 
 #bg-canvas{position:fixed;inset:0;z-index:0}
 
-.game-shell{width:100%;height:100%;display:grid;place-items:center;position:relative;z-index:1}
+.game-shell{
+  width:100vw;
+  height:100dvh;
+  /* Fallback para navegadores sem dvh */
+  height:100vh;
+  height:100dvh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  position:relative;
+  z-index:1;
+  overflow:hidden;
+}
 
 canvas#game{
-  width:min(98vw,1320px);height:auto;aspect-ratio:1360/780;
-  max-width:100vw;max-height:100vh;
-  border-radius:16px;border:1px solid rgba(120,200,255,0.15);
+  /* CORRIGIDO: Escalonamento mobile-first para celular de 7 polegadas */
+  /* O canvas ocupa toda a tela mantendo o aspect ratio 1360:780 */
+  width:min(100vw, calc(100dvh * (1360/780)));
+  height:min(100dvh, calc(100vw * (780/1360)));
+  max-width:100vw;
+  max-height:100dvh;
+  /* Centralizado na tela */
+  display:block;
+  margin:auto;
+  border-radius:8px;
+  border:1px solid rgba(120,200,255,0.10);
   background:transparent;
-  box-shadow:0 0 80px rgba(80,140,255,0.12),inset 0 0 40px rgba(0,0,0,0.6);
-  position:relative;z-index:2;cursor:none
+  box-shadow:0 0 40px rgba(80,140,255,0.10),inset 0 0 20px rgba(0,0,0,0.5);
+  position:relative;z-index:2;cursor:none;
+  /* Bloquear comportamentos de navegador no canvas */
+  -webkit-user-select:none;user-select:none;
+  -webkit-touch-callout:none;
+  -webkit-tap-highlight-color:transparent;
+  touch-action:none;
 }
 
 .hud{
@@ -160,7 +193,15 @@ canvas#game{
 .pick-grid{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
 .relic-grid,.shop-grid,.upgrade-grid{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
 
-button{border:none;border-radius:14px;cursor:pointer;font:inherit;font-weight:700;transition:transform 0.15s,filter 0.15s,box-shadow 0.15s}
+button{
+  border:none;border-radius:14px;cursor:pointer;font:inherit;font-weight:700;
+  transition:transform 0.15s,filter 0.15s,box-shadow 0.15s;
+  /* Bloquear comportamentos de navegador em botões */
+  -webkit-user-select:none;user-select:none;
+  -webkit-touch-callout:none;
+  -webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;
+}
 button:hover{transform:translateY(-2px) scale(1.015);filter:brightness(1.08)}
 
 .main-btn{
@@ -834,7 +875,8 @@ function resizeCanvasForDevice(){
   canvas.height = Math.floor(h * dpr);
   canvas.style.width = Math.floor(w) + 'px';
   canvas.style.height = Math.floor(h) + 'px';
-  ctx.scale(dpr, dpr);
+  // CORRIGIDO: usar setTransform em vez de scale() para evitar acumulo de transformacoes
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 resizeCanvasForDevice();
 window.addEventListener('resize', resizeCanvasForDevice);
@@ -949,10 +991,33 @@ window.addEventListener('keydown', e=>{
   if(k==='r') useSkill(2);
 });
 window.addEventListener('keyup', e=>keys[e.key.toLowerCase()]=false);
+
+// ── BLOQUEIO TOTAL DE COMPORTAMENTOS DE NAVEGADOR ──
+// Impede menu de contexto (long-press, clique direito)
+document.addEventListener('contextmenu', e=>e.preventDefault(), {passive:false});
+// Impede selecao de texto
+document.addEventListener('selectstart', e=>e.preventDefault(), {passive:false});
+// Impede zoom por pinça e outros gestos nativos
+document.addEventListener('gesturestart', e=>e.preventDefault(), {passive:false});
+document.addEventListener('gesturechange', e=>e.preventDefault(), {passive:false});
+document.addEventListener('gestureend', e=>e.preventDefault(), {passive:false});
+// Impede scroll e bounce em iOS
+document.addEventListener('touchstart', e=>{
+  if(e.touches.length>1) e.preventDefault(); // bloqueia pinça
+}, {passive:false});
+document.addEventListener('touchmove', e=>e.preventDefault(), {passive:false});
+document.addEventListener('touchend', e=>{
+  if(e.cancelable) e.preventDefault();
+}, {passive:false});
+// Impede drag de elementos
+document.addEventListener('dragstart', e=>e.preventDefault(), {passive:false});
+// Impede highlight de toque (iOS)
+document.addEventListener('touchforcechange', e=>e.preventDefault(), {passive:false});
 canvas.addEventListener('mousemove', e=>{
   const rect=canvas.getBoundingClientRect();
-  mouse.x=(e.clientX-rect.left)*(canvas.width/rect.width);
-  mouse.y=(e.clientY-rect.top)*(canvas.height/rect.height);
+  // CORRIGIDO: usar dimensoes logicas (sem DPR) para coordenadas do mouse
+  mouse.x=(e.clientX-rect.left)*(W/rect.width);
+  mouse.y=(e.clientY-rect.top)*(H/rect.height);
 });
 canvas.addEventListener('mousedown', ()=>mouse.down=true);
 window.addEventListener('mouseup', ()=>mouse.down=false);
@@ -1792,6 +1857,8 @@ function updateDrones(dt){
 
 function updateWaveState(){
   if(game.shopPending&&game.enemies.length===0&&game.enemyBullets.length===0){openShopMenu();return}
+  // Quando boss morre: shopPending=true, entao o bloco acima cuida disso
+  // Waves normais: incrementa e inicia proxima wave automaticamente
   if(game.running&&!game.betweenWaves&&!game.shopPending&&game.enemiesSpawnedThisWave>=game.enemiesToSpawn&&game.enemies.length===0&&game.enemyBullets.length===0){
     game.wave++;
     startNextWave();
@@ -2034,6 +2101,84 @@ function drawHazards(){
       ctx.beginPath();ctx.arc(h.x,h.y,pr,0,Math.PI*2);ctx.fill();
       ctx.strokeStyle='rgba(198,160,255,0.3)';ctx.lineWidth=1.5;
       ctx.beginPath();ctx.arc(h.x,h.y,pr,0,Math.PI*2);ctx.stroke();
+      ctx.restore();
+    }
+    // CORRIGIDO: Render dos hazards extras que estavam sem visualizacao
+    if(h.type==='sparkMine'){
+      ctx.save();
+      const armed=(h.armed||0)<=0;
+      const pr=h.r+Math.sin(h.pulse*3)*3;
+      ctx.shadowBlur=armed?22:12; ctx.shadowColor=armed?'#ffd166':'#ff9900';
+      ctx.strokeStyle=armed?'#ffd166':'#ff9900'; ctx.lineWidth=2;
+      ctx.beginPath();ctx.arc(h.x,h.y,pr,0,Math.PI*2);ctx.stroke();
+      ctx.globalAlpha=armed?0.55:0.25;
+      const g=ctx.createRadialGradient(h.x,h.y,2,h.x,h.y,pr);
+      g.addColorStop(0,armed?'rgba(255,209,102,0.6)':'rgba(255,153,0,0.4)');
+      g.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=g; ctx.beginPath();ctx.arc(h.x,h.y,pr,0,Math.PI*2);ctx.fill();
+      // Icone de mina
+      ctx.globalAlpha=1; ctx.fillStyle=armed?'#ffd166':'#ff9900';
+      ctx.beginPath();ctx.arc(h.x,h.y,4,0,Math.PI*2);ctx.fill();
+      ctx.restore();
+    }
+    if(h.type==='rotatingLaser'){
+      ctx.save();
+      const dx=Math.cos(h.ang),dy=Math.sin(h.ang);
+      const x1=h.x-dx*h.len/2, y1=h.y-dy*h.len/2;
+      const x2=h.x+dx*h.len/2, y2=h.y+dy*h.len/2;
+      ctx.shadowBlur=28; ctx.shadowColor='#ff4fa8';
+      ctx.globalAlpha=0.85;
+      const lg=ctx.createLinearGradient(x1,y1,x2,y2);
+      lg.addColorStop(0,'rgba(255,79,168,0)');
+      lg.addColorStop(0.5,'#ff4fa8');
+      lg.addColorStop(1,'rgba(255,79,168,0)');
+      ctx.strokeStyle=lg; ctx.lineWidth=h.width*0.6;
+      ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+      ctx.globalAlpha=0.35; ctx.lineWidth=h.width*1.4;
+      ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+      ctx.restore();
+    }
+    if(h.type==='chronoRift'){
+      ctx.save();
+      const pr=h.r+Math.sin(h.pulse)*8;
+      ctx.shadowBlur=32; ctx.shadowColor='#61dafb';
+      const g=ctx.createRadialGradient(h.x,h.y,8,h.x,h.y,pr);
+      g.addColorStop(0,'rgba(97,218,251,0.35)');
+      g.addColorStop(0.5,'rgba(97,218,251,0.12)');
+      g.addColorStop(1,'rgba(97,218,251,0)');
+      ctx.fillStyle=g; ctx.beginPath();ctx.arc(h.x,h.y,pr,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle='rgba(97,218,251,0.6)'; ctx.lineWidth=2;
+      ctx.beginPath();ctx.arc(h.x,h.y,pr,0,Math.PI*2);ctx.stroke();
+      // Espiral interna
+      ctx.globalAlpha=0.5; ctx.strokeStyle='#9bedff'; ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.arc(h.x,h.y,pr*0.55,0,Math.PI*2);ctx.stroke();
+      ctx.restore();
+    }
+    if(h.type==='stormOrb'){
+      ctx.save();
+      const pr=h.r+Math.sin(h.pulse*4)*3;
+      ctx.shadowBlur=24; ctx.shadowColor='#9bedff';
+      const g=ctx.createRadialGradient(h.x,h.y,2,h.x,h.y,pr);
+      g.addColorStop(0,'rgba(155,237,255,0.7)');
+      g.addColorStop(0.6,'rgba(97,218,251,0.3)');
+      g.addColorStop(1,'rgba(97,218,251,0)');
+      ctx.fillStyle=g; ctx.beginPath();ctx.arc(h.x,h.y,pr,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle='#9bedff'; ctx.lineWidth=2;
+      ctx.beginPath();ctx.arc(h.x,h.y,pr,0,Math.PI*2);ctx.stroke();
+      ctx.restore();
+    }
+    if(h.type==='arcWall'){
+      ctx.save();
+      ctx.shadowBlur=20; ctx.shadowColor='#ffe38c';
+      ctx.globalAlpha=0.75;
+      const lg=ctx.createLinearGradient(0,h.y-h.width,0,h.y+h.width);
+      lg.addColorStop(0,'rgba(255,227,140,0)');
+      lg.addColorStop(0.5,'rgba(255,227,140,0.8)');
+      lg.addColorStop(1,'rgba(255,227,140,0)');
+      ctx.fillStyle=lg;
+      ctx.fillRect(0,h.y-h.width,W,h.width*2);
+      ctx.globalAlpha=0.9; ctx.strokeStyle='#ffd166'; ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(0,h.y);ctx.lineTo(W,h.y);ctx.stroke();
       ctx.restore();
     }
   }
@@ -2767,7 +2912,10 @@ startNextWave = function(){
   _baseStartNextWave();
   ensureEclipseState();
   game.mapDecor=makeMapDecor(game.wave);
-  // Hazards extras por wave, sem remover os originais.
+  // CORRIGIDO: Limpar hazards permanentes da wave anterior para evitar acumulo
+  // Manter apenas hazards com 'life' definido (temporarios) e limpar os permanentes
+  game.hazards = (game.hazards||[]).filter(h=>h.life!==undefined && h.life>0);
+  // Adicionar hazards da nova wave (um de cada tipo, sem acumulo)
   if(game.wave>=2) game.hazards.push({type:'sparkMine',x:rand(140,W-140),y:rand(110,H-110),r:22,pulse:rand(0,6),damageCd:0,armed:0.8});
   if(game.wave>=5) game.hazards.push({type:'rotatingLaser',x:W/2,y:H/2,len:380,width:16,ang:rand(0,Math.PI),speed:0.55+game.wave*0.015,damageCd:0,pulse:0});
   if(game.wave>=8) game.hazards.push({type:'chronoRift',x:rand(180,W-180),y:rand(120,H-120),r:70,pulse:rand(0,6),damageCd:0});
@@ -20785,12 +20933,34 @@ function removeTickets(){try{$('#powerTickets544')?.remove();$('#powerTickets548
   }
 
   function blockGestureDefaults(){
+    // CORRIGIDO: Bloquear TODOS os comportamentos de navegador globalmente
     document.addEventListener('gesturestart', ev => ev.preventDefault(), {passive:false});
+    document.addEventListener('gesturechange', ev => ev.preventDefault(), {passive:false});
+    document.addEventListener('gestureend', ev => ev.preventDefault(), {passive:false});
+    // Bloquear menu de contexto em toda a pagina (long-press, clique direito)
+    document.addEventListener('contextmenu', ev => ev.preventDefault());
+    // Bloquear selecao de texto via toque
+    document.addEventListener('selectstart', ev => ev.preventDefault());
+    // Bloquear scroll durante o jogo
     document.addEventListener('touchmove', ev => {
-      if(document.body.classList.contains('cs-touch-playing') && !ev.target.closest?.('.card,.overlay')) ev.preventDefault();
+      if(!ev.target.closest?.('.card,.overlay')) ev.preventDefault();
+    }, {passive:false});
+    // Bloquear zoom por pinça em toda a pagina
+    document.addEventListener('touchstart', ev => {
+      if(ev.touches.length > 1) ev.preventDefault();
+    }, {passive:false});
+    // Bloquear double-tap zoom
+    let lastTap = 0;
+    document.addEventListener('touchend', ev => {
+      const now = Date.now();
+      if(now - lastTap < 300 && !ev.target.closest?.('.card,.overlay,.pick-btn,.main-btn,.upgrade-btn,.shop-btn,.duneBtn461,.pick461,.buy461')) ev.preventDefault();
+      lastTap = now;
     }, {passive:false});
     const canvasEl = byId('game');
-    if(canvasEl) canvasEl.addEventListener('contextmenu', ev => ev.preventDefault());
+    if(canvasEl){
+      canvasEl.addEventListener('contextmenu', ev => ev.preventDefault());
+      canvasEl.addEventListener('touchstart', ev => ev.preventDefault(), {passive:false});
+    }
   }
 
   /* ── PWA SERVICE WORKER ── */
@@ -20929,11 +21099,9 @@ function removeTickets(){try{$('#powerTickets544')?.remove();$('#powerTickets548
   .cs-install-menu-btn:hover { transform: translateY(-2px); filter: brightness(1.08); }
   .cs-install-menu-btn.visible { display: block; }
 
-  /* Ocultar banner quando já instalado */
-  @media (display-mode: standalone), (display-mode: fullscreen) {
-    #cs-install-banner { display: none !important; }
-    .cs-install-menu-btn { display: none !important; }
-  }
+  /* CORRIGIDO: Ocultar banner de instalacao permanentemente - comportamento de APK nativo */
+  #cs-install-banner { display: none !important; }
+  .cs-install-menu-btn { display: none !important; }
 
   /* ── FINAL MOBILE OPTIMIZATION (Priority Override) ── */
   .skill-bar {
@@ -21023,6 +21191,16 @@ function removeTickets(){try{$('#powerTickets544')?.remove();$('#powerTickets548
 <script>
 (function(){
   'use strict';
+  // CORRIGIDO: Script de instalacao PWA desativado para comportamento de APK nativo
+  // O banner e botoes de instalacao estao ocultos via CSS
+  // Stub completo que evita erros em openStartMenu461 e oculta o botao de instalacao
+  window.__csInstall = {
+    hasPrompt: function(){ return false; },
+    trigger: function(){},
+    showMenuBtn: function(){},
+    isInstalled: function(){ return true; }  // Simula sempre instalado para ocultar botao
+  };
+  return; // Desativa todo o restante do script
 
   /* ── Estado global do prompt de instalação ── */
   var _installPrompt = null;
@@ -21563,9 +21741,13 @@ canvas.style.willChange = 'transform';
     display:grid!important;place-items:center!important;padding:0!important;
   }
   body.cs-mobile-runtime canvas#game{
+    /* CORRIGIDO: Escalonamento correto para celular de 7 polegadas */
     width:min(100vw,calc(var(--cs-vh) * var(--cs-arena-aspect)))!important;
     height:min(var(--cs-vh),calc(100vw / var(--cs-arena-aspect)))!important;
     max-width:100vw!important;max-height:var(--cs-vh)!important;
+    /* Centralizado */
+    display:block!important;
+    margin:auto!important;
     border-radius:8px!important;border-color:rgba(120,200,255,.12)!important;
     box-shadow:0 0 22px rgba(80,140,255,.10),inset 0 0 22px rgba(0,0,0,.52)!important;
     image-rendering:auto;touch-action:none!important;
@@ -22434,36 +22616,8 @@ canvas.style.willChange = 'transform';
   else boot();
 })();
 
-if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('sw.js?v=1782124385434', {updateViaCache: 'none'}).then(reg=>{
-    console.log('[Cache-Busting] Service Worker registrado com versão: 1782124385434');
-    
-    // Verificar atualizações a cada 10 segundos
-    setInterval(() => {
-      reg.update().then(() => {
-        console.log('[Cache-Busting] Verificação de atualização do SW realizada');
-      });
-    }, 10000);
-    
-    // Se houver um novo SW esperando, força a ativação
-    if(reg.waiting){
-      console.log('[Cache-Busting] Novo SW aguardando - forçando ativação');
-      reg.waiting.postMessage({type: 'SKIP_WAITING'});
-    }
-    
-    reg.onupdatefound = () => {
-      const newWorker = reg.installing;
-      newWorker.onstatechange = () => {
-        if(newWorker.state === 'installed' && navigator.serviceWorker.controller){
-          console.log('[Cache-Busting] Novo SW instalado - forçando ativação');
-          newWorker.postMessage({type: 'SKIP_WAITING'});
-        }
-      };
-    };
-  }).catch(err=>{
-    console.log('[Cache-Busting] Erro ao registrar SW:', err);
-  });
-}
+// CORRIGIDO: Registro duplicado de service worker removido para evitar comportamento de PWA
+// O SW principal ja e registrado no boot() do patch v6.0
 </script>
 
 
