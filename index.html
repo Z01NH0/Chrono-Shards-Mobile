@@ -7,7 +7,7 @@
 <title>CHRONO SHARDS — Eclipse Update</title>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&amp;family=Rajdhani:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
 <!-- CHRONO SHARDS — APP METADATA -->
-<!-- CORRIGIDO: Removidas metas de instalacao PWA para comportamento de APK nativo -->
+<link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#090d1f">
 <meta name="color-scheme" content="dark">
 <meta name="application-name" content="Chrono Shards">
@@ -21099,9 +21099,8 @@ function removeTickets(){try{$('#powerTickets544')?.remove();$('#powerTickets548
   .cs-install-menu-btn:hover { transform: translateY(-2px); filter: brightness(1.08); }
   .cs-install-menu-btn.visible { display: block; }
 
-  /* CORRIGIDO: Ocultar banner de instalacao permanentemente - comportamento de APK nativo */
-  #cs-install-banner { display: none !important; }
-  .cs-install-menu-btn { display: none !important; }
+  /* PWA Install UI */
+  .cs-install-menu-btn.visible { display: block; }
 
   /* ── FINAL MOBILE OPTIMIZATION (Priority Override) ── */
   .skill-bar {
@@ -21191,17 +21190,6 @@ function removeTickets(){try{$('#powerTickets544')?.remove();$('#powerTickets548
 <script>
 (function(){
   'use strict';
-  // CORRIGIDO: Script de instalacao PWA desativado para comportamento de APK nativo
-  // O banner e botoes de instalacao estao ocultos via CSS
-  // Stub completo que evita erros em openStartMenu461 e oculta o botao de instalacao
-  window.__csInstall = {
-    hasPrompt: function(){ return false; },
-    trigger: function(){},
-    showMenuBtn: function(){},
-    isInstalled: function(){ return true; }  // Simula sempre instalado para ocultar botao
-  };
-  return; // Desativa todo o restante do script
-
   /* ── Estado global do prompt de instalação ── */
   var _installPrompt = null;
   var _bannerShown   = false;
@@ -21296,10 +21284,10 @@ function removeTickets(){try{$('#powerTickets544')?.remove();$('#powerTickets548
   });
 
   /* ── Expõe função para o menu injetar o botão ── */
-    window.__csInstall = {
-    hasPrompt : function(){ return !!_installPrompt; },
-    trigger   : triggerInstall,
-    showBtn   : showMenuInstallBtn,
+  window.__csInstall = {
+    hasPrompt: function() { return !!_installPrompt; },
+    trigger: triggerInstall,
+    showMenuBtn: showMenuInstallBtn,
     isInstalled: isInstalled
   };
 })();
