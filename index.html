@@ -840,10 +840,15 @@ resizeCanvasForDevice();
 window.addEventListener('resize', resizeCanvasForDevice);
 window.addEventListener('orientationchange', () => setTimeout(resizeCanvasForDevice, 100));
 
-const W = canvas.width / (window.devicePixelRatio || 1);
-const H = canvas.height / (window.devicePixelRatio || 1);
+// W e H são getters dinâmicos: sempre retornam a dimensão lógica atual do canvas,
+// independente de quando o patch mobile redimensionou o canvas após o carregamento.
+// Isso corrige o bug onde tudo aparecia no canto durante as waves em mobile.
+function _getCanvasLogicalW(){ return Math.round(canvas.width / (window.devicePixelRatio || 1)); }
+function _getCanvasLogicalH(){ return Math.round(canvas.height / (window.devicePixelRatio || 1)); }
+Object.defineProperty(window, 'W', { get: _getCanvasLogicalW, configurable: true });
+Object.defineProperty(window, 'H', { get: _getCanvasLogicalH, configurable: true });
 const keys = {};
-const mouse = {x:W/2, y:H/2, down:false};
+const mouse = {x:_getCanvasLogicalW()/2, y:_getCanvasLogicalH()/2, down:false};
 let game = null, last = 0;
 const SAVE_KEY = 'chrono_v4_meta';
 
@@ -21444,6 +21449,11 @@ function removeTickets(){try{$('#powerTickets544')?.remove();$('#powerTickets548
   
   hudEditorCancel.addEventListener('click', () => {
     hudEditorOverlay.classList.add('hidden');
+    // Cancelar volta ao menu principal
+    try {
+      if (typeof window.openStartMenu === 'function') window.openStartMenu();
+      else if (typeof openStartMenu461 === 'function') openStartMenu461();
+    } catch {}
   });
   
   hudEditorSave.addEventListener('click', () => {
@@ -21452,6 +21462,11 @@ function removeTickets(){try{$('#powerTickets544')?.remove();$('#powerTickets548
     hudEditorOverlay.classList.add('hidden');
     // Aplicar novo layout aos botões em tempo real
     applyHudLayout();
+    // Salvar também volta ao menu principal
+    try {
+      if (typeof window.openStartMenu === 'function') window.openStartMenu();
+      else if (typeof openStartMenu461 === 'function') openStartMenu461();
+    } catch {}
   });
   
   function applyHudLayout(){
@@ -21736,6 +21751,147 @@ canvas.style.willChange = 'transform';
       background:rgba(4,8,18,.78);border:1px solid rgba(97,218,251,.22);box-shadow:0 0 18px rgba(97,218,251,.12);pointer-events:none;white-space:nowrap;
     }
   }
+
+  /* ── MISSÕES LANDSCAPE MOBILE: HUD compacto e layout otimizado para celular horizontal ── */
+  @media (orientation:landscape) and (max-height:520px){
+    body.cs-mobile-runtime .card.dune461,
+    body.cs-mobile-runtime .card{
+      padding:8px 10px!important;
+      max-height:calc(var(--cs-vh) - 8px)!important;
+      overflow:auto!important;
+    }
+    body.cs-mobile-runtime .card h1,
+    body.cs-mobile-runtime .duneTitle461{
+      font-size:clamp(14px,3.8vw,22px)!important;
+      margin-bottom:3px!important;
+      line-height:1.0!important;
+    }
+    body.cs-mobile-runtime .duneSub461{
+      font-size:clamp(9px,1.7vw,11px)!important;
+      margin:3px auto 6px!important;
+      line-height:1.25!important;
+    }
+    body.cs-mobile-runtime .section461{
+      font-size:clamp(9px,1.8vw,11px)!important;
+      letter-spacing:.10em!important;
+      margin:8px 0 5px!important;
+    }
+    body.cs-mobile-runtime .missionGrid461,
+    body.cs-mobile-runtime .awakGrid461{
+      grid-template-columns:repeat(auto-fit,minmax(160px,1fr))!important;
+      gap:5px!important;
+      margin-top:5px!important;
+    }
+    body.cs-mobile-runtime .duneMission461,
+    body.cs-mobile-runtime .duneRelic461{
+      padding:7px 8px!important;
+      border-radius:10px!important;
+      min-height:unset!important;
+    }
+    body.cs-mobile-runtime .duneMission461 strong,
+    body.cs-mobile-runtime .awakCard461 strong{
+      font-size:10px!important;
+      line-height:1.1!important;
+    }
+    body.cs-mobile-runtime .duneMission461 span,
+    body.cs-mobile-runtime .awakCard461 span{
+      font-size:9px!important;
+      line-height:1.2!important;
+      margin-top:3px!important;
+    }
+    body.cs-mobile-runtime .progress461{
+      height:5px!important;
+      margin-top:5px!important;
+    }
+    body.cs-mobile-runtime .badge461{
+      font-size:7.5px!important;
+      padding:2px 5px!important;
+      margin-bottom:4px!important;
+    }
+    body.cs-mobile-runtime .awakCard461{
+      padding:7px 8px!important;
+      min-height:unset!important;
+      border-radius:10px!important;
+    }
+    body.cs-mobile-runtime .awakPortrait461{
+      height:36px!important;
+      font-size:20px!important;
+      border-radius:10px!important;
+      margin-bottom:5px!important;
+    }
+    body.cs-mobile-runtime .awakKeyDock463{
+      padding:5px 9px!important;
+      font-size:9px!important;
+      margin:5px 0 0!important;
+    }
+    body.cs-mobile-runtime .duneActions461{
+      margin-top:8px!important;
+      gap:6px!important;
+    }
+    body.cs-mobile-runtime .duneBtn461{
+      padding:6px 10px!important;
+      font-size:9px!important;
+      min-height:28px!important;
+    }
+    body.cs-mobile-runtime .small461{
+      font-size:8.5px!important;
+    }
+    body.cs-mobile-runtime .dunePanel461{
+      padding:7px 8px!important;
+      min-height:unset!important;
+      border-radius:10px!important;
+    }
+    body.cs-mobile-runtime .dunePanel461 strong{
+      font-size:10px!important;
+    }
+    body.cs-mobile-runtime .dunePanel461 span{
+      font-size:9px!important;
+      margin-top:3px!important;
+    }
+    body.cs-mobile-runtime .duneGrid461{
+      grid-template-columns:repeat(auto-fit,minmax(150px,1fr))!important;
+      gap:5px!important;
+    }
+    body.cs-mobile-runtime .startStage461{
+      min-height:unset!important;
+    }
+    body.cs-mobile-runtime .classGrid461{
+      grid-template-columns:repeat(auto-fit,minmax(140px,1fr))!important;
+      gap:5px!important;
+    }
+    body.cs-mobile-runtime .classCard461{
+      min-height:unset!important;
+      padding:7px!important;
+    }
+    body.cs-mobile-runtime .modelBox461{
+      height:60px!important;
+      margin:2px 0 6px!important;
+    }
+    body.cs-mobile-runtime .pick461,
+    body.cs-mobile-runtime .buy461{
+      padding:6px 8px!important;
+      font-size:9px!important;
+      margin-top:6px!important;
+    }
+    body.cs-mobile-runtime .classTop461{
+      flex-direction:column!important;
+      gap:6px!important;
+    }
+    body.cs-mobile-runtime .classTop461 .duneActions461{
+      margin-top:0!important;
+    }
+    body.cs-mobile-runtime .classGroups461{
+      gap:8px!important;
+      margin-top:8px!important;
+    }
+    body.cs-mobile-runtime .classGroup461{
+      padding:8px!important;
+      border-radius:14px!important;
+    }
+    body.cs-mobile-runtime .classGroupHead461{
+      margin-bottom:6px!important;
+    }
+  }
 </style>
 
 <script id="chronoMobileFinalOverride600">
@@ -21771,8 +21927,21 @@ canvas.style.willChange = 'transform';
     return o.classList.contains('hidden') || cs.display === 'none' || cs.visibility === 'hidden';
   };
 
-  function logicalW(){ try { if (typeof W === 'number' && W > 0) return W; } catch {} return 1360; }
-  function logicalH(){ try { if (typeof H === 'number' && H > 0) return H; } catch {} return 780; }
+  function logicalW(){
+    try {
+      // Usa getter dinâmico se disponível (corrige bug de resolução em mobile)
+      if (typeof _getCanvasLogicalW === 'function') return _getCanvasLogicalW();
+      const v = window.W; if (typeof v === 'number' && v > 0) return v;
+    } catch {}
+    return 1360;
+  }
+  function logicalH(){
+    try {
+      if (typeof _getCanvasLogicalH === 'function') return _getCanvasLogicalH();
+      const v = window.H; if (typeof v === 'number' && v > 0) return v;
+    } catch {}
+    return 780;
+  }
   function activeDpr(){ return mobileRuntime() ? Math.min(1.45, window.devicePixelRatio || 1) : Math.min(2, window.devicePixelRatio || 1); }
 
   function syncViewportVar(){ document.documentElement.style.setProperty('--cs-vh', visualH() + 'px'); }
@@ -21815,6 +21984,13 @@ canvas.style.willChange = 'transform';
     if (hud) hud.style.width = cssW + 'px';
     if (gameShell) { gameShell.style.width = '100vw'; gameShell.style.height = 'var(--cs-vh)'; }
     resizeBackground();
+    // Sincronizar mouse com centro da arena após resize para evitar mira fora da tela
+    try {
+      if (typeof mouse !== 'undefined' && !mouse.down) {
+        mouse.x = lw / 2;
+        mouse.y = lh / 2;
+      }
+    } catch {}
   }
 
   function correctMouseFromEvent(ev){
@@ -22090,8 +22266,26 @@ canvas.style.willChange = 'transform';
         renderItems();
       });
     }
-    byId('csMapSave').onclick = () => { saveLayout(temp); overlay.classList.remove('visible'); applySavedLayout(true); injectMapperIntoSettings(); };
-    byId('csMapCancel').onclick = () => { overlay.classList.remove('visible'); applySavedLayout(); };
+    byId('csMapSave').onclick = () => {
+      saveLayout(temp);
+      overlay.classList.remove('visible');
+      applySavedLayout(true);
+      injectMapperIntoSettings();
+      // Após salvar, voltar ao menu principal
+      try {
+        if (typeof window.openStartMenu === 'function') window.openStartMenu();
+        else if (typeof openStartMenu461 === 'function') openStartMenu461();
+      } catch {}
+    };
+    byId('csMapCancel').onclick = () => {
+      overlay.classList.remove('visible');
+      applySavedLayout();
+      // Cancelar também volta ao menu principal
+      try {
+        if (typeof window.openStartMenu === 'function') window.openStartMenu();
+        else if (typeof openStartMenu461 === 'function') openStartMenu461();
+      } catch {}
+    };
     byId('csMapPreset').onclick = () => { resetLayout(); temp = readLayout(); if(sizeInput) sizeInput.value = Math.round(readScale()*100); renderItems(); };
   }
   window.openMobileButtonMapper = openButtonMapper;
