@@ -21047,7 +21047,7 @@ function removeTickets(){try{$('#powerTickets544')?.remove();$('#powerTickets548
     color: rgba(176,196,232,0.8);
     line-height: 1.3;
   }
-  #cs-install-btn {
+  #cs-install-btn, .cs-install-menu-btn {
     flex-shrink: 0;
     border: none;
     border-radius: 999px;
@@ -21271,17 +21271,31 @@ function removeTickets(){try{$('#powerTickets544')?.remove();$('#powerTickets548
   });
 
   /* ── Botão de instalação no banner ── */
-  document.addEventListener('DOMContentLoaded', function(){
+  function initBannerEvents(){
     var installBtn  = document.getElementById('cs-install-btn');
     var dismissBtn  = document.getElementById('cs-install-dismiss');
 
-    if(installBtn)  installBtn.addEventListener('click', triggerInstall);
-    if(dismissBtn)  dismissBtn.addEventListener('click', function(){
-      hideBanner();
-      _dismissed = true;
-      sessionStorage.setItem('cs-install-dismissed', '1');
-    });
-  });
+    if(installBtn) {
+      installBtn.onclick = function(e) {
+        e.preventDefault();
+        triggerInstall();
+      };
+    }
+    if(dismissBtn) {
+      dismissBtn.onclick = function(e) {
+        e.preventDefault();
+        hideBanner();
+        _dismissed = true;
+        sessionStorage.setItem('cs-install-dismissed', '1');
+      };
+    }
+  }
+
+  if(document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initBannerEvents);
+  } else {
+    initBannerEvents();
+  }
 
   /* ── Expõe função para o menu injetar o botão ── */
   window.__csInstall = {
