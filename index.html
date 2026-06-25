@@ -35,7 +35,7 @@ html,body{
   width:100%;height:100%;overflow:hidden;background:#000;
   font-family:'Rajdhani',sans-serif;color:#eef2ff;
   overscroll-behavior:none;
-  touch-action:none;
+  touch-action:manipulation;
   -webkit-text-size-adjust:none;
   text-size-adjust:none;
 }
@@ -992,27 +992,8 @@ window.addEventListener('keydown', e=>{
 });
 window.addEventListener('keyup', e=>keys[e.key.toLowerCase()]=false);
 
-// ── BLOQUEIO TOTAL DE COMPORTAMENTOS DE NAVEGADOR ──
-// Impede menu de contexto (long-press, clique direito)
-document.addEventListener('contextmenu', e=>e.preventDefault(), {passive:false});
-// Impede selecao de texto
-document.addEventListener('selectstart', e=>e.preventDefault(), {passive:false});
-// Impede zoom por pinça e outros gestos nativos
-document.addEventListener('gesturestart', e=>e.preventDefault(), {passive:false});
-document.addEventListener('gesturechange', e=>e.preventDefault(), {passive:false});
-document.addEventListener('gestureend', e=>e.preventDefault(), {passive:false});
-// Impede scroll e bounce em iOS
-document.addEventListener('touchstart', e=>{
-  if(e.touches.length>1) e.preventDefault(); // bloqueia pinça
-}, {passive:false});
-document.addEventListener('touchmove', e=>e.preventDefault(), {passive:false});
-document.addEventListener('touchend', e=>{
-  if(e.cancelable) e.preventDefault();
-}, {passive:false});
-// Impede drag de elementos
-document.addEventListener('dragstart', e=>e.preventDefault(), {passive:false});
-// Impede highlight de toque (iOS)
-document.addEventListener('touchforcechange', e=>e.preventDefault(), {passive:false});
+// ── BLOQUEIO DE COMPORTAMENTOS DE NAVEGADOR ──
+// Bloqueios movidos para blockGestureDefaults() para permitir cliques em elementos de interface.
 canvas.addEventListener('mousemove', e=>{
   const rect=canvas.getBoundingClientRect();
   // CORRIGIDO: usar dimensoes logicas (sem DPR) para coordenadas do mouse
@@ -20933,33 +20914,41 @@ function removeTickets(){try{$('#powerTickets544')?.remove();$('#powerTickets548
   }
 
   function blockGestureDefaults(){
-    // CORRIGIDO: Bloquear TODOS os comportamentos de navegador globalmente
+    // Bloquear gestos de zoom e menu de contexto
     document.addEventListener('gesturestart', ev => ev.preventDefault(), {passive:false});
-    document.addEventListener('gesturechange', ev => ev.preventDefault(), {passive:false});
-    document.addEventListener('gestureend', ev => ev.preventDefault(), {passive:false});
-    // Bloquear menu de contexto em toda a pagina (long-press, clique direito)
-    document.addEventListener('contextmenu', ev => ev.preventDefault());
-    // Bloquear selecao de texto via toque
-    document.addEventListener('selectstart', ev => ev.preventDefault());
-    // Bloquear scroll durante o jogo
+    document.addEventListener('contextmenu', ev => {
+      if(!ev.target.closest?.('.card,.overlay,#cs-install-banner')) ev.preventDefault();
+    });
+    document.addEventListener('selectstart', ev => {
+      if(!ev.target.closest?.('input')) ev.preventDefault();
+    });
+
+    // Bloquear scroll apenas fora de elementos de interface
     document.addEventListener('touchmove', ev => {
-      if(!ev.target.closest?.('.card,.overlay')) ev.preventDefault();
+      if(!ev.target.closest?.('.card,.overlay,#cs-install-banner')) ev.preventDefault();
     }, {passive:false});
-    // Bloquear zoom por pinça em toda a pagina
+
+    // Bloquear zoom por pinça
     document.addEventListener('touchstart', ev => {
       if(ev.touches.length > 1) ev.preventDefault();
     }, {passive:false});
-    // Bloquear double-tap zoom
+
+    // Bloquear double-tap zoom, mas permitir cliques rápidos em botões
     let lastTap = 0;
     document.addEventListener('touchend', ev => {
       const now = Date.now();
-      if(now - lastTap < 300 && !ev.target.closest?.('.card,.overlay,.pick-btn,.main-btn,.upgrade-btn,.shop-btn,.duneBtn461,.pick461,.buy461')) ev.preventDefault();
+      if(now - lastTap < 300) {
+        if(!ev.target.closest?.('button, .card, .overlay, #cs-install-banner')) ev.preventDefault();
+      }
       lastTap = now;
     }, {passive:false});
+
     const canvasEl = byId('game');
     if(canvasEl){
-      canvasEl.addEventListener('contextmenu', ev => ev.preventDefault());
-      canvasEl.addEventListener('touchstart', ev => ev.preventDefault(), {passive:false});
+      canvasEl.addEventListener('touchstart', ev => {
+        // Permitir toque no canvas apenas se não houver overlay
+        if(overlayHidden()) ev.preventDefault();
+      }, {passive:false});
     }
   }
 
@@ -21277,13 +21266,13 @@ function removeTickets(){try{$('#powerTickets544')?.remove();$('#powerTickets548
 
     if(installBtn) {
       installBtn.onclick = function(e) {
-        e.preventDefault();
+        e.stopPropagation();
         triggerInstall();
       };
     }
     if(dismissBtn) {
       dismissBtn.onclick = function(e) {
-        e.preventDefault();
+        e.stopPropagation();
         hideBanner();
         _dismissed = true;
         sessionStorage.setItem('cs-install-dismissed', '1');
@@ -22290,14 +22279,14 @@ canvas.style.willChange = 'transform';
     const moveJoy = byId('csMoveJoy'), aimJoy = byId('csAimJoy'), dashBtn = byId('csDashBtn'), ultBtn = byId('csUltimateMobileBtn');
     if (moveJoy && moveJoy.dataset.csFinal !== '1') {
       moveJoy.dataset.csFinal = '1';
-      moveJoy.addEventListener('pointerdown', ev => { if(!canShowControls()) return; ev.preventDefault(); controlState.movePointer=ev.pointerId; moveJoy.setPointerCapture?.(ev.pointerId); const a=pointerAxis(moveJoy,ev); applyMoveAxis(a.x,a.y); }, {passive:false});
-      moveJoy.addEventListener('pointermove', ev => { if(ev.pointerId!==controlState.movePointer) return; ev.preventDefault(); const a=pointerAxis(moveJoy,ev); applyMoveAxis(a.x,a.y); }, {passive:false});
+      moveJoy.addEventListener('pointerdown', ev => { if(!canShowControls()) return; controlState.movePointer=ev.pointerId; moveJoy.setPointerCapture?.(ev.pointerId); const a=pointerAxis(moveJoy,ev); applyMoveAxis(a.x,a.y); }, {passive:true});
+      moveJoy.addEventListener('pointermove', ev => { if(ev.pointerId!==controlState.movePointer) return; const a=pointerAxis(moveJoy,ev); applyMoveAxis(a.x,a.y); }, {passive:true});
       ['pointerup','pointercancel','lostpointercapture'].forEach(t => moveJoy.addEventListener(t, releaseMove));
     }
     if (aimJoy && aimJoy.dataset.csFinal !== '1') {
       aimJoy.dataset.csFinal = '1';
-      aimJoy.addEventListener('pointerdown', ev => { if(!canShowControls()) return; ev.preventDefault(); controlState.aimPointer=ev.pointerId; aimJoy.setPointerCapture?.(ev.pointerId); const a=pointerAxis(aimJoy,ev); applyAimAxis(a.x,a.y,true); fireOnce(); }, {passive:false});
-      aimJoy.addEventListener('pointermove', ev => { if(ev.pointerId!==controlState.aimPointer) return; ev.preventDefault(); const a=pointerAxis(aimJoy,ev); applyAimAxis(a.x,a.y,true); }, {passive:false});
+      aimJoy.addEventListener('pointerdown', ev => { if(!canShowControls()) return; controlState.aimPointer=ev.pointerId; aimJoy.setPointerCapture?.(ev.pointerId); const a=pointerAxis(aimJoy,ev); applyAimAxis(a.x,a.y,true); fireOnce(); }, {passive:true});
+      aimJoy.addEventListener('pointermove', ev => { if(ev.pointerId!==controlState.aimPointer) return; const a=pointerAxis(aimJoy,ev); applyAimAxis(a.x,a.y,true); }, {passive:true});
       ['pointerup','pointercancel','lostpointercapture'].forEach(t => aimJoy.addEventListener(t, releaseAim));
     }
     if (dashBtn && dashBtn.dataset.csFinal !== '1') { dashBtn.dataset.csFinal='1'; dashBtn.addEventListener('pointerdown', ev => { if(!canShowControls()) return; ev.preventDefault(); dash(); }, {passive:false}); }
