@@ -858,23 +858,26 @@ const skillBar = document.getElementById('skillBar');
 function resizeCanvasForDevice(){
   // Se o patch mobile v6.0 já está ativo, ele cuida do escalonamento
   if(window.__chronoMobileFinalOverride600) return;
-  const dpr = window.devicePixelRatio || 1;
-  const isMobile = window.matchMedia('(hover:none),(pointer:coarse)').matches || navigator.maxTouchPoints > 0;
-  const maxWidth = window.innerWidth * (isMobile ? 1.0 : 0.98);
-  const maxHeight = window.innerHeight * (isMobile ? 1.0 : 0.92);
-  const aspectRatio = 1360 / 780;
-  let w, h;
+  // Resolução lógica interna fixa: 1360x780
+  // O canvas sempre desenha em 1360x780, o CSS escala para caber na tela
+  const GAME_LOGICAL_W = 1360, GAME_LOGICAL_H = 780;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = Math.floor(GAME_LOGICAL_W * dpr);
+  canvas.height = Math.floor(GAME_LOGICAL_H * dpr);
+  // Calcular o tamanho CSS para caber na tela mantendo o aspect ratio
+  const maxWidth = window.innerWidth;
+  const maxHeight = window.innerHeight;
+  const aspectRatio = GAME_LOGICAL_W / GAME_LOGICAL_H;
+  let cssW, cssH;
   if(maxWidth / maxHeight > aspectRatio){
-    h = maxHeight;
-    w = h * aspectRatio;
+    cssH = maxHeight;
+    cssW = cssH * aspectRatio;
   } else {
-    w = maxWidth;
-    h = w / aspectRatio;
+    cssW = maxWidth;
+    cssH = cssW / aspectRatio;
   }
-  canvas.width = Math.floor(w * dpr);
-  canvas.height = Math.floor(h * dpr);
-  canvas.style.width = Math.floor(w) + 'px';
-  canvas.style.height = Math.floor(h) + 'px';
+  canvas.style.width = Math.floor(cssW) + 'px';
+  canvas.style.height = Math.floor(cssH) + 'px';
   // CORRIGIDO: usar setTransform em vez de scale() para evitar acumulo de transformacoes
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
@@ -882,15 +885,16 @@ resizeCanvasForDevice();
 window.addEventListener('resize', resizeCanvasForDevice);
 window.addEventListener('orientationchange', () => setTimeout(resizeCanvasForDevice, 100));
 
-// W e H são getters dinâmicos: sempre retornam a dimensão lógica atual do canvas,
-// independente de quando o patch mobile redimensionou o canvas após o carregamento.
-// Isso corrige o bug onde tudo aparecia no canto durante as waves em mobile.
-function _getCanvasLogicalW(){ return Math.round(canvas.width / (window.devicePixelRatio || 1)); }
-function _getCanvasLogicalH(){ return Math.round(canvas.height / (window.devicePixelRatio || 1)); }
+// W e H retornam SEMPRE a resolução lógica fixa do jogo (1360x780).
+// O canvas pode ter buffer maior (DPR) ou ser exibido menor (CSS scale),
+// mas todo o código de gameplay usa estas constantes como espaço de coordenadas.
+const _GAME_LOGICAL_W = 1360, _GAME_LOGICAL_H = 780;
+function _getCanvasLogicalW(){ return _GAME_LOGICAL_W; }
+function _getCanvasLogicalH(){ return _GAME_LOGICAL_H; }
 Object.defineProperty(window, 'W', { get: _getCanvasLogicalW, configurable: true });
 Object.defineProperty(window, 'H', { get: _getCanvasLogicalH, configurable: true });
 const keys = {};
-const mouse = {x:_getCanvasLogicalW()/2, y:_getCanvasLogicalH()/2, down:false};
+const mouse = {x:_GAME_LOGICAL_W/2, y:_GAME_LOGICAL_H/2, down:false};
 let game = null, last = 0;
 const SAVE_KEY = 'chrono_v4_meta';
 
@@ -22132,23 +22136,37 @@ canvas.style.willChange = 'transform';
     } catch {}
   }
 
+  // Resolução lógica interna fixa do jogo (coordenadas do canvas)
+  const GAME_W = 1360, GAME_H = 780;
+
   function fitCanvasForScreen(){
     if (!canvasEl) return;
     syncViewportVar();
-    const lw = logicalW(), lh = logicalH();
-    const dpr = activeDpr();
-    const desiredW = Math.max(1, Math.round(lw * dpr));
-    const desiredH = Math.max(1, Math.round(lh * dpr));
+
+    // Sempre usar a resolução lógica fixa do jogo (1360x780).
+    // O DPR real é usado para o buffer de pixels (nitidez), mas limitado
+    // para não desperdiçar memória em telas de alta densidade.
+    const dpr = Math.min(window.devicePixelRatio || 1, mobileRuntime() ? 2 : 2);
+    const desiredW = Math.max(1, Math.round(GAME_W * dpr));
+    const desiredH = Math.max(1, Math.round(GAME_H * dpr));
     if (canvasEl.width !== desiredW || canvasEl.height !== desiredH) {
       canvasEl.width = desiredW;
       canvasEl.height = desiredH;
     }
     const context = canvasEl.getContext('2d');
+    // Transformação: escalar o buffer de pixels para o espaço lógico 1360x780
     try { context.setTransform(dpr, 0, 0, dpr, 0, 0); } catch {}
 
+    // Atualizar os getters W e H para sempre retornarem a resolução lógica fixa
+    try {
+      Object.defineProperty(window, 'W', { get: () => GAME_W, configurable: true });
+      Object.defineProperty(window, 'H', { get: () => GAME_H, configurable: true });
+    } catch {}
+
+    // CSS: escalonar o canvas para caber na tela mantendo o aspect ratio 1360:780
     const maxW = visualW();
     const maxH = visualH();
-    const aspect = lw / lh;
+    const aspect = GAME_W / GAME_H;
     let cssW = maxW, cssH = cssW / aspect;
     if (cssH > maxH) { cssH = maxH; cssW = cssH * aspect; }
     cssW = Math.floor(cssW); cssH = Math.floor(cssH);
@@ -22160,8 +22178,8 @@ canvas.style.willChange = 'transform';
     // Sincronizar mouse com centro da arena após resize para evitar mira fora da tela
     try {
       if (typeof mouse !== 'undefined' && !mouse.down) {
-        mouse.x = lw / 2;
-        mouse.y = lh / 2;
+        mouse.x = GAME_W / 2;
+        mouse.y = GAME_H / 2;
       }
     } catch {}
   }
@@ -22171,8 +22189,8 @@ canvas.style.willChange = 'transform';
     try {
       const rect = canvasEl.getBoundingClientRect();
       if (!rect.width || !rect.height || typeof mouse === 'undefined') return;
-      mouse.x = (ev.clientX - rect.left) * (logicalW() / rect.width);
-      mouse.y = (ev.clientY - rect.top) * (logicalH() / rect.height);
+      mouse.x = (ev.clientX - rect.left) * (GAME_W / rect.width);
+      mouse.y = (ev.clientY - rect.top) * (GAME_H / rect.height);
     } catch {}
   }
 
@@ -22238,8 +22256,8 @@ canvas.style.willChange = 'transform';
     try {
       if (typeof mouse !== 'undefined' && getGame()?.player) {
         const p = getGame().player;
-        mouse.x = p.x + Math.cos(controlState.aim.angle) * Math.max(logicalW(), logicalH());
-        mouse.y = p.y + Math.sin(controlState.aim.angle) * Math.max(logicalW(), logicalH());
+        mouse.x = p.x + Math.cos(controlState.aim.angle) * Math.max(GAME_W, GAME_H);
+        mouse.y = p.y + Math.sin(controlState.aim.angle) * Math.max(GAME_W, GAME_H);
         mouse.down = !!shooting;
       }
     } catch {}
@@ -22587,6 +22605,21 @@ canvas.style.willChange = 'transform';
     installGestureGuards();
     ['openSettings529','openSettings461','openSettingsMenu37'].forEach(wrapSettings);
     injectMapperIntoSettings();
+
+    // Garantir que o canvas seja ajustado corretamente ao iniciar uma partida
+    const _resetGame = typeof resetGame === 'function' ? resetGame : null;
+    if (_resetGame && !_resetGame.__csMobileBootWrapped) {
+      const wrapped = function(classKey) {
+        const result = _resetGame.apply(this, arguments);
+        // Após resetGame, re-aplicar o fit e W/H corretos
+        try { fitCanvasForScreen(); } catch {}
+        try { syncControlsVisibility(); } catch {}
+        return result;
+      };
+      wrapped.__csMobileBootWrapped = true;
+      try { window.resetGame = wrapped; (0,eval)('resetGame=window.resetGame'); } catch {}
+    }
+
     scheduleFit();
     applySavedLayout();
     syncControlsVisibility();
