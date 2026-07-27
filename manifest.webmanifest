@@ -1,18 +1,26 @@
 {
-  "id": "https://chrono-shards-mobile.vercel.app/",
+  "id": "./",
   "name": "Chrono Shards",
   "short_name": "Chrono Shards",
   "description": "Escolha seu personagem, domine habilidades únicas, enfrente hordas cada vez mais brutais e evolua sua build com power-ups, relíquias, maestrias e recompensas raras. Cada partida é uma nova tentativa de ir mais longe, derrotar chefes mais perigosos e descobrir até onde você consegue resistir antes que o Eclipse consuma tudo.",
-  "start_url": "https://chrono-shards-mobile.vercel.app/",
-  "scope": "https://chrono-shards-mobile.vercel.app/",
+  "start_url": "./",
+  "scope": "./",
   "display": "fullscreen",
-  "display_override": ["fullscreen", "standalone", "minimal-ui", "browser"],
+  "display_override": [
+    "fullscreen",
+    "standalone",
+    "minimal-ui",
+    "browser"
+  ],
   "orientation": "landscape",
   "background_color": "#020408",
   "theme_color": "#090d1f",
   "lang": "pt-BR",
   "dir": "auto",
-  "categories": ["games", "entertainment"],
+  "categories": [
+    "games",
+    "entertainment"
+  ],
   "prefer_related_applications": false,
   "icons": [
     {
@@ -69,8 +77,13 @@
       "name": "Jogar Agora",
       "short_name": "Jogar",
       "description": "Inicia o jogo diretamente",
-      "url": "https://chrono-shards-mobile.vercel.app/",
-      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+      "url": "./",
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     }
   ]
 }
