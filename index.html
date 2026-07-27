@@ -821,7 +821,11 @@ const stars = Array.from({length:200},()=>({
   r:Math.random()*1.5+0.3, t:Math.random()*Math.PI*2,
   sp:Math.random()*0.02+0.005
 }));
-function drawBG(){
+let _bgLastFrame=0;
+function drawBG(ts=0){
+  requestAnimationFrame(drawBG);
+  if(ts-_bgLastFrame<42) return;
+  _bgLastFrame=ts;
   bgX.clearRect(0,0,bgC.width,bgC.height);
   const g=bgX.createRadialGradient(bgC.width/2,bgC.height/2,80,bgC.width/2,bgC.height/2,Math.max(bgC.width,bgC.height)*0.7);
   g.addColorStop(0,'#0a0d1e'); g.addColorStop(1,'#020408');
@@ -831,9 +835,9 @@ function drawBG(){
     bgX.globalAlpha=a; bgX.fillStyle='#a0c4ff';
     bgX.beginPath(); bgX.arc(s.x,s.y,s.r,0,Math.PI*2); bgX.fill();
   }
-  bgX.globalAlpha=1; requestAnimationFrame(drawBG);
+  bgX.globalAlpha=1;
 }
-drawBG();
+requestAnimationFrame(drawBG);
 
 // ── CORE ────────────────────────────────────────────────────────
 const canvas = document.getElementById('game');
@@ -860,7 +864,7 @@ const skillBar = document.getElementById('skillBar');
 /* ── RESPONSIVE CANVAS SCALING ── */
 function resizeCanvasForDevice(){
   // Se o patch mobile v6.0 já está ativo, ele cuida do escalonamento
-  if(window.__chronoMobileFinalOverride600) return;
+  if(window.__chronoMobileFinalOverride610) return;
   // Resolução lógica interna fixa: 1360x780
   // O canvas sempre desenha em 1360x780, o CSS escala para caber na tela
   const GAME_LOGICAL_W = 1360, GAME_LOGICAL_H = 780;
@@ -1025,6 +1029,80 @@ const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 const dist2=(a,b)=>{const dx=a.x-b.x,dy=a.y-b.y;return dx*dx+dy*dy;}; // sem sqrt
 const angleTo=(a,b)=>Math.atan2(b.y-a.y,b.x-a.x);
 const circleCollide=(a,b)=>{const dx=a.x-b.x,dy=a.y-b.y,r=a.r+b.r;return dx*dx+dy*dy<r*r;}; // evita sqrt
+
+// Índice espacial reconstruído uma vez por atualização de projéteis.
+// Reduz o custo normal de colisão de projéteis × todos os inimigos.
+const _ENEMY_GRID_CELL = 112;
+const _enemySpatialGrid = new Map();
+let _enemySpatialMaxRadius = 64;
+function rebuildEnemySpatialGrid(){
+  _enemySpatialGrid.clear();
+  _enemySpatialMaxRadius = 32;
+  if(!game || !Array.isArray(game.enemies)) return;
+  for(const e of game.enemies){
+    if(!e || !Number.isFinite(e.x) || !Number.isFinite(e.y)) continue;
+    _enemySpatialMaxRadius = Math.max(_enemySpatialMaxRadius, Number(e.r)||0);
+    const cx=Math.floor(e.x/_ENEMY_GRID_CELL), cy=Math.floor(e.y/_ENEMY_GRID_CELL);
+    const key=cx+','+cy;
+    let cell=_enemySpatialGrid.get(key);
+    if(!cell){cell=[];_enemySpatialGrid.set(key,cell);}
+    cell.push(e);
+  }
+}
+function nearbyEnemiesSpatial(obj, extraRadius=0){
+  if(!_enemySpatialGrid.size || !obj) return game?.enemies || [];
+  const reach=(Number(obj.r)||0)+Math.max(0,Number(extraRadius)||0)+_enemySpatialMaxRadius;
+  const minX=Math.floor((obj.x-reach)/_ENEMY_GRID_CELL), maxX=Math.floor((obj.x+reach)/_ENEMY_GRID_CELL);
+  const minY=Math.floor((obj.y-reach)/_ENEMY_GRID_CELL), maxY=Math.floor((obj.y+reach)/_ENEMY_GRID_CELL);
+  const out=[];
+  for(let cy=minY;cy<=maxY;cy++) for(let cx=minX;cx<=maxX;cx++){
+    const cell=_enemySpatialGrid.get(cx+','+cy);
+    if(cell) out.push(...cell);
+  }
+  return out;
+}
+window.__chronoNearbyEnemies = nearbyEnemiesSpatial;
+
+// Um único agendador para tarefas leves de manutenção de interface.
+// Substitui vários setInterval independentes e pausa o trabalho quando a aba está oculta.
+const __chronoMaintenanceTasks = [];
+let __chronoMaintenanceTimer = 0;
+function __chronoRunMaintenance(){
+  __chronoMaintenanceTimer = 0;
+  const now = performance.now();
+  let nextDelay = document.hidden ? 1000 : 900;
+  if(!document.hidden){
+    for(const task of __chronoMaintenanceTasks){
+      if(!task.active) continue;
+      if(now >= task.next){
+        try{ task.fn(); }catch(err){ console.warn('Manutenção de interface falhou',err); }
+        task.next = now + task.interval;
+      }
+      nextDelay = Math.min(nextDelay, Math.max(180, task.next-now));
+    }
+  }
+  if(__chronoMaintenanceTasks.some(task=>task.active)){
+    __chronoMaintenanceTimer = setTimeout(__chronoRunMaintenance, Math.max(180, Math.min(1000,nextDelay)));
+  }
+}
+window.__chronoScheduleMaintenance = function(fn,interval=900){
+  if(typeof fn!=='function') return null;
+  const ms=Math.max(250,Number(interval)||900);
+  const task={fn,interval:ms,next:performance.now()+ms,active:true};
+  __chronoMaintenanceTasks.push(task);
+  if(!__chronoMaintenanceTimer) __chronoMaintenanceTimer=setTimeout(__chronoRunMaintenance,Math.min(ms,900));
+  return task;
+};
+window.__chronoCancelMaintenance = function(task){ if(task) task.active=false; };
+document.addEventListener('visibilitychange',()=>{
+  if(!document.hidden){
+    const now=performance.now();
+    for(const task of __chronoMaintenanceTasks) task.next=Math.min(task.next,now+80);
+    if(!__chronoMaintenanceTimer&&__chronoMaintenanceTasks.some(task=>task.active)) __chronoMaintenanceTimer=setTimeout(__chronoRunMaintenance,80);
+  }
+},{passive:true});
+
+
 function randomChoices(arr,n){const p=[...arr],o=[];while(o.length<n&&p.length)o.push(p.splice(Math.floor(Math.random()*p.length),1)[0]);return o}
 
 function loadMeta(){
@@ -2698,158 +2776,21 @@ function drawHints(){
   ctx.restore();
 }
 
-// ── CAMERA ZOOM SYSTEM (Mobile 7" Optimization) ──
-const cameraZoom = {
-  level: 0.65,  // Zoom out para mostrar mais mapa em 7 polegadas
-  targetLevel: 0.65,
-  smoothing: 0.08,
-  minZoom: 0.5,
-  maxZoom: 1.2,
-  
-  update(){
-    this.level += (this.targetLevel - this.level) * this.smoothing;
-  },
-  
-  apply(ctx, W, H){
-    const scale = this.level;
-    ctx.translate(W/2, H/2);
-    ctx.scale(scale, scale);
-    ctx.translate(-W/2, -H/2);
-  },
-  
-  reset(ctx, W, H){
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-  }
-};
-
-// Detectar se é mobile e ajustar zoom automaticamente
-function detectAndAdjustZoom(){
-  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-  const screenDiagonal = Math.sqrt(window.innerWidth**2 + window.innerHeight**2) / window.devicePixelRatio;
-  
-  // Para telas de ~7 polegadas (1920x1080 em 16:9)
-  if(isMobile && screenDiagonal > 150){
-    cameraZoom.targetLevel = 0.62;  // Zoom out mais para telas maiores
-  } else if(isMobile && screenDiagonal > 120){
-    cameraZoom.targetLevel = 0.68;  // Zoom médio para 6-7 polegadas
-  } else if(isMobile){
-    cameraZoom.targetLevel = 0.75;  // Zoom normal para telas menores
-  }
-}
-
-detectAndAdjustZoom();
-window.addEventListener('resize', detectAndAdjustZoom);
-// ── GLOBAL SCALE MULTIPLIER (Mobile Optimization) ──
-const SCALE = {
-  player: 0.85,      // Personagem 15% menor
-  enemy: 0.80,       // Inimigos 20% menores
-  projectile: 0.75,  // Projéteis 25% menores
-  particle: 0.70,    // Partículas 30% menores
-  effect: 0.80,      // Efeitos 20% menores
-  hazard: 0.85,      // Obstáculos 15% menores
-  loot: 0.80         // Loot 20% menor
-};
-
-// ── APPLY SCALE MULTIPLIER TO ALL ENTITIES ──
-function applyScale(value, scaleType = 'player'){
+// ── ESCALA VISUAL (não altera hitboxes) ──────────────────────────
+// Estes multiplicadores são usados apenas nas rotinas de desenho.
+// A física continua usando os raios originais para preservar colisões e balanceamento.
+const SCALE = Object.freeze({
+  player: 0.85,
+  enemy: 0.80,
+  projectile: 0.75,
+  particle: 0.70,
+  effect: 0.80,
+  hazard: 0.85,
+  loot: 0.80
+});
+function applyScale(value, scaleType='player'){
   return value * (SCALE[scaleType] || 1);
 }
-
-// Sobrescrever o raio dos objetos com escala aplicada
-const originalGameInit = window.resetGame;
-window.resetGame = function(){
-  if(originalGameInit) originalGameInit.apply(this, arguments);
-  // Aplicar escala aos inimigos quando forem criados
-  if(game && game.enemies){
-    for(let e of game.enemies){
-      e.r = (e.r || 0) * SCALE.enemy;
-    }
-  }
-};
-
-// ── OBJECT POOLING SYSTEM (Extreme Performance Optimization) ──
-const ObjectPool = {
-  pools: {
-    bullet: [],
-    particle: [],
-    enemyBullet: []
-  },
-  
-  init(){
-    // Pré-alocar objetos para evitar garbage collection durante o jogo
-    for(let i = 0; i < 200; i++) this.pools.bullet.push({});
-    for(let i = 0; i < 300; i++) this.pools.particle.push({});
-    for(let i = 0; i < 150; i++) this.pools.enemyBullet.push({});
-  },
-  
-  get(type){
-    const pool = this.pools[type];
-    return pool.length > 0 ? pool.pop() : {};
-  },
-  
-  return(type, obj){
-    if(this.pools[type].length < (type === 'bullet' ? 200 : type === 'particle' ? 300 : 150)){
-      this.pools[type].push(obj);
-    }
-  },
-  
-  getStats(){
-    return {
-      bulletAvailable: this.pools.bullet.length,
-      particleAvailable: this.pools.particle.length,
-      enemyBulletAvailable: this.pools.enemyBullet.length
-    };
-  }
-};
-
-ObjectPool.init();
-
-// Otimização: Limitar atualizações de HUD a cada 2 frames
-let hudUpdateCounter = 0;
-const HUD_UPDATE_INTERVAL = 2;
-
-function shouldUpdateHUD(){
-  hudUpdateCounter++;
-  if(hudUpdateCounter >= HUD_UPDATE_INTERVAL){
-    hudUpdateCounter = 0;
-    return true;
-  }
-  return false;
-}
-
-// Otimização: Usar requestIdleCallback para tarefas não-críticas
-function scheduleIdleTask(fn){
-  if('requestIdleCallback' in window){
-    requestIdleCallback(fn, {timeout: 100});
-  } else {
-    setTimeout(fn, 16);
-  }
-}
-
-// Reduzir frequência de cálculos de colisão em mobile
-const collisionOptimization = {
-  checkInterval: 2,
-  counter: 0,
-  shouldCheck(){
-    this.counter++;
-    if(this.counter >= this.checkInterval){
-      this.counter = 0;
-      return true;
-    }
-    return false;
-  }
-};
-
-// Desabilitar efeitos visuais menos importantes em mobile
-const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-const visualQuality = {
-  particleCount: isMobileDevice ? 0.6 : 1.0,
-  shadowQuality: isMobileDevice ? 0 : 1,
-  glowEffects: isMobileDevice ? 0.5 : 1.0,
-  antiAlias: isMobileDevice ? false : true
-};
-
-
 
 // ── RENDER ───────────────────────────────────────────────────────
 const textCache = {};
@@ -2931,10 +2872,12 @@ window.addEventListener('resize', initMobileResolution);
 // ── LOOP ─────────────────────────────────────────────────────────
 // ── LOOP ─────────────────────────────────────────────────────────
 let _hudTimer = 0;
+let _lastPausedRenderTs = 0;
 const _HUD_INTERVAL = 0.1; // Atualizar HUD a cada 100ms (10fps) em vez de todo frame
 
 function loop(ts){
   requestAnimationFrame(loop);
+  try{window.__chronoUpdatePauseButtonVisibility?.();}catch{}
   if(_loopPaused || !game) return;
   let dt=(ts-last)/1000||0;last=ts;
   // Mobile: cap mais agressivo para evitar espirais de morte de frame
@@ -2958,7 +2901,10 @@ function loop(ts){
       updateHUD();
     }
   }
-  render();
+  if(game.running || ts-_lastPausedRenderTs>=250){
+    render();
+    if(!game.running) _lastPausedRenderTs=ts;
+  }
 }
 
 // Controle de partículas agora é feito dentro de addParticles() com cap por pool.
@@ -4601,6 +4547,7 @@ render = function(){
 
   updateBullets=function(dt){
     safeEnsureIdentityState();
+    rebuildEnemySpatialGrid();
     for(let i=game.bullets.length-1;i>=0;i--){
       const b=game.bullets[i];
       const oldX=b.x, oldY=b.y;
@@ -4617,9 +4564,9 @@ render = function(){
         if(t){t.hp-=4*game.upgrades.damage;t.hitFlash=0.06;addLightning(b.x,b.y,t.x,t.y,'#9ff8ff')}
       }
       if((b.weaponKey==='acid'||b.poison)&&Math.random()<0.06){game.hazards.push({type:'poisonCloud',x:b.x,y:b.y,r:32,pulse:0,life:1.5,damageCd:0})}
-      for(let j=game.enemies.length-1;j>=0;j--){
-        const e=game.enemies[j];
-        if(!circleCollide(b,e)) continue;
+      for(const e of nearbyEnemiesSpatial(b)){
+        const j=game.enemies.indexOf(e);
+        if(j<0 || !circleCollide(b,e)) continue;
         if(typeof lineBlockedByMap==='function'&&lineBlockedByMap(b,e,(b.r||3))) continue;
         if(game.timeStopActive>0&&e.frozenTime>0) e.frozenTime=game.timeStopActive;
         const crit=Math.random()<game.upgrades.critChance;
@@ -4640,9 +4587,9 @@ render = function(){
         if(game.upgrades.lifesteal>0) game.player.hp=clamp(game.player.hp+dmg*Math.min(game.upgrades.lifesteal,0.08),0,game.player.maxHp);
         if(b.explosive){
           addRing(b.x,b.y,'#ff9966',55,4);
-          for(let k=game.enemies.length-1;k>=0;k--){
-            const ek=game.enemies[k];
-            if(k!==j&&dist(b,ek)<55&&!(typeof lineBlockedByMap==='function'&&lineBlockedByMap(b,ek,3))){ek.hp-=dmg*0.4;ek.hitFlash=0.08;if(ek.hp<=0) enemyDeath(k,ek);}
+          for(const ek of nearbyEnemiesSpatial(b,55)){
+            const k=game.enemies.indexOf(ek);
+            if(k>=0&&k!==j&&dist(b,ek)<55&&!(typeof lineBlockedByMap==='function'&&lineBlockedByMap(b,ek,3))){ek.hp-=dmg*0.4;ek.hitFlash=0.08;if(ek.hp<=0) enemyDeath(k,ek);}
           }
           game.bullets.splice(i,1);
         }
@@ -17654,7 +17601,7 @@ function killKey37(e){
   },true);
   const mo=new MutationObserver(()=>cleanIfOutsideBook());
   mo.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['class']});
-  setInterval(cleanIfOutsideBook,650);
+  window.__chronoScheduleMaintenance(cleanIfOutsideBook,650);
   setTimeout(()=>{addStyle539();cleanIfOutsideBook();},0);
 })();
 </script>
@@ -17784,7 +17731,7 @@ function killKey37(e){
   const mo=new MutationObserver(()=>{sanitizeHub();sanitizeBook();});
   mo.observe(document.body,{childList:true,subtree:true});
   setTimeout(()=>{sanitizeHub();sanitizeBook();},0);
-  setInterval(()=>{ if(isBook())sanitizeBook(); else removeTickets(); sanitizeHub(); },900);
+  window.__chronoScheduleMaintenance(()=>{ if(isBook())sanitizeBook(); else removeTickets(); sanitizeHub(); },900);
 })();
 </script>
 <script>
@@ -18974,7 +18921,7 @@ function removeTickets(){try{$('#powerTickets544')?.remove();$('#powerTickets548
       try{el.setAttribute('data-power-ticket-root','1')}catch{}
     });
   }
-  setInterval(()=>{markTickets550();syncPowerTickets550();},700);
+  window.__chronoScheduleMaintenance(()=>{markTickets550();syncPowerTickets550();},700);
 
   // Toda troca de tela valida se os tickets ainda pertencem à tela de Power-Ups/Sinergias.
   try{
@@ -20008,7 +19955,7 @@ function removeTickets(){try{$('#powerTickets544')?.remove();$('#powerTickets548
 
 
   let lastSparks584=N(readMeta().riftSparks);
-  setInterval(()=>{try{const bonus=N(game?.upgrades?.riftSparkEndBonus584);const m=readMeta();const cur=N(m.riftSparks);if(bonus>0&&cur>lastSparks584){const diff=cur-lastSparks584,extra=Math.floor(diff*bonus);if(extra>0){m.riftSparks=cur+extra;writeMeta(m);lastSparks584=m.riftSparks;}else lastSparks584=cur;}else if(cur!==lastSparks584)lastSparks584=cur;}catch{}},900);
+  window.__chronoScheduleMaintenance(()=>{try{const bonus=N(game?.upgrades?.riftSparkEndBonus584);const m=readMeta();const cur=N(m.riftSparks);if(bonus>0&&cur>lastSparks584){const diff=cur-lastSparks584,extra=Math.floor(diff*bonus);if(extra>0){m.riftSparks=cur+extra;writeMeta(m);lastSparks584=m.riftSparks;}else lastSparks584=cur;}else if(cur!==lastSparks584)lastSparks584=cur;}catch{}},900);
 
   try{new MutationObserver(()=>{if($('#overlayCard')?.classList?.contains('powerPage544'))setTimeout(()=>{const txt=$('#overlayCard')?.textContent||'';if(/POWER-UPS DAS FISSURAS/i.test(txt))ensureTickets584('rift');else if(/SINERGIAS/i.test(txt))ensureTickets584('syn');else if(/POWER-UPS/i.test(txt))ensureTickets584('powers');},40);}).observe(document.body,{childList:true,subtree:true});}catch{}
 
@@ -20252,7 +20199,7 @@ function removeTickets(){try{$('#powerTickets544')?.remove();$('#powerTickets548
     if(isCatalog586()&&!$('#overlayCard [data-catalog-root586]'))installTickets586(pageKind586()||'powers');
   }
   try{new MutationObserver(()=>setTimeout(sync586,45)).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['class','style']});}catch{}
-  setInterval(sync586,1200);
+  window.__chronoScheduleMaintenance(sync586,1200);
   setTimeout(sync586,0);setTimeout(sync586,200);
 
 })();
@@ -20735,7 +20682,7 @@ function removeTickets(){try{$('#powerTickets544')?.remove();$('#powerTickets548
   });
 
   // Reparo não é global; este intervalo leve é idempotente, não observa mutations e não reescreve texto igual.
-  setInterval(()=>{try{patchVisible587();}catch(e){console.warn('discount safe 5.8.7 interval',e);}},350);
+  window.__chronoScheduleMaintenance(()=>{try{patchVisible587();}catch(e){console.warn('discount safe 5.8.7 maintenance',e);}},350);
 
   // Auditoria/normalização dos novos power-ups, para saves antigos e picks com apply parcial.
   function auditRiftPowers587(){
@@ -20755,7 +20702,7 @@ function removeTickets(){try{$('#powerTickets544')?.remove();$('#powerTickets548
       if(u.riftAbsoluteCore584&&s.kind==='wall'&&n(s.hp,0)>0)s.hp=s.maxHp;
     }
   }
-  setInterval(()=>{try{auditRiftPowers587();}catch(e){console.warn('rift power audit 5.8.7',e);}},900);
+  window.__chronoScheduleMaintenance(()=>{try{auditRiftPowers587();}catch(e){console.warn('rift power audit 5.8.7',e);}},900);
 
 })();
 </script>
@@ -20779,372 +20726,7 @@ function removeTickets(){try{$('#powerTickets544')?.remove();$('#powerTickets548
 
 
 <!-- CHRONO SHARDS — compactação visual mobile: modelos, projéteis e efeitos menores -->
-<script id="chronoPwaMobileScalePatch">
-(() => {
-  if (window.__chronoPwaMobileScalePatch592) return;
-  window.__chronoPwaMobileScalePatch592 = true;
-
-  const isTouchLike = () => {
-    try { return matchMedia('(hover:none), (pointer:coarse)').matches || navigator.maxTouchPoints > 0; }
-    catch { return navigator.maxTouchPoints > 0; }
-  };
-  const arr = v => Array.isArray(v) ? v : [];
-  const markName = prop => `__csMobileScaled_${prop}`;
-
-  function scaleOnce(obj, prop, factor, min = 0){
-    if(!obj || !Number.isFinite(Number(obj[prop]))) return;
-    const mark = markName(prop);
-    if(obj[mark]) return;
-    obj[prop] = Math.max(min, Number(obj[prop]) * factor);
-    obj[mark] = true;
-  }
-
-  function scaleGroup(list, rules){
-    for(const obj of arr(list)){
-      if(!obj) continue;
-      for(const [prop, factor, min] of rules) scaleOnce(obj, prop, factor, min);
-    }
-  }
-
-  function compactGameVisuals(){
-    let active = false;
-    try { active = isTouchLike() && !!(game && game.running); } catch { active = false; }
-    document.body.classList.toggle('cs-mobile-scaled', active);
-    if(!active) return;
-
-    const g = game;
-    const p = g.player;
-    if(p){
-      scaleOnce(p, 'r', .86, 8);
-      if(Array.isArray(p.trail) && p.trail.length > 9) p.trail.length = 9;
-    }
-
-    for(const e of arr(g.enemies)){
-      const boss = e.type === 'boss' || e.bossType;
-      scaleOnce(e, 'r', boss ? .86 : .82, boss ? 28 : 5);
-      scaleOnce(e, 'w', .82, 8);
-      scaleOnce(e, 'h', .82, 8);
-      scaleOnce(e, 'size', .82, 5);
-    }
-
-    scaleGroup(g.bullets, [
-      ['r', .72, 2.5], ['size', .72, 2.5], ['width', .76, 2], ['height', .76, 2]
-    ]);
-    scaleGroup(g.enemyBullets, [
-      ['r', .74, 2.5], ['size', .74, 2.5], ['width', .76, 2], ['height', .76, 2]
-    ]);
-    scaleGroup(g.loot, [ ['r', .80, 5], ['size', .80, 5] ]);
-    scaleGroup(g.particles, [ ['size', .68, 1], ['r', .70, 1] ]);
-    scaleGroup(g.rings, [ ['maxR', .78, 18], ['width', .78, 1.5] ]);
-    scaleGroup(g.shockwaves, [ ['maxR', .78, 30], ['width', .78, 1.5] ]);
-    scaleGroup(g.hazards, [ ['r', .78, 20], ['width', .74, 6], ['size', .78, 8] ]);
-    scaleGroup(g.floatingTexts, [ ['size', .84, 9] ]);
-
-    // Limita tremor em telas pequenas para não atrapalhar a leitura.
-    if(Number.isFinite(Number(g.shake))) g.shake = Math.min(Number(g.shake), 14);
-  }
-
-  setInterval(() => { try { compactGameVisuals(); } catch {} }, 90);
-  window.addEventListener('resize', () => setTimeout(compactGameVisuals, 80));
-  window.addEventListener('orientationchange', () => setTimeout(compactGameVisuals, 250));
-})();
-</script>
-
 <!-- CHRONO SHARDS — controles mobile integrados + Service Worker -->
-<script id="chronoPwaMobileControlsScript">
-(() => {
-  if (window.__chronoPwaMobileControlsApplied) return;
-  window.__chronoPwaMobileControlsApplied = true;
-
-  const isTouchLike = () => {
-    try { return matchMedia('(hover:none), (pointer:coarse)').matches || navigator.maxTouchPoints > 0; }
-    catch { return navigator.maxTouchPoints > 0; }
-  };
-
-  const state = {
-    movePointer:null,
-    aimPointer:null,
-    move:{x:0,y:0},
-    aim:{x:1,y:0,angle:0},
-    keyState:Object.create(null),
-    active:false
-  };
-
-  function byId(id){ return document.getElementById(id); }
-  function hasGame(){ try { return !!(game && game.player); } catch { return false; } }
-  function gameIsRunning(){ try { return !!(game && game.running); } catch { return false; } }
-  function overlayIsHidden(){
-    const o = byId('overlay');
-    if(!o) return true;
-    const cs = getComputedStyle(o);
-    return o.classList.contains('hidden') || cs.display === 'none' || cs.visibility === 'hidden';
-  }
-  function canShowControls(){ return isTouchLike() && gameIsRunning() && overlayIsHidden() && !document.getElementById('csButtonMapperOverlay')?.classList.contains('visible'); }
-
-  function emitKey(key, down){
-    const normalized = key.toLowerCase();
-    if (state.keyState[normalized] === down) return;
-    state.keyState[normalized] = down;
-    try { if (typeof keys !== 'undefined') keys[normalized] = down; } catch {}
-    const eventName = down ? 'keydown' : 'keyup';
-    const eventKey = normalized === 'shift' ? 'Shift' : normalized;
-    const code = normalized === 'shift' ? 'ShiftLeft' : `Key${normalized.toUpperCase()}`;
-    try { window.dispatchEvent(new KeyboardEvent(eventName,{key:eventKey,code,bubbles:true,cancelable:true})); } catch {}
-  }
-
-  function moveKnob(joyId,x,y){
-    const joy = byId(joyId);
-    const knob = joy && joy.querySelector('.cs-joy-knob');
-    if(!knob) return;
-    const cssTravel = getComputedStyle(joy).getPropertyValue('--cs-knob-travel').trim();
-    const max = Number.parseFloat(cssTravel) || 28;
-    knob.style.transform = `translate(calc(-50% + ${x * max}px), calc(-50% + ${y * max}px))`;
-  }
-
-  function axisFromPointer(joy, ev){
-    const rect = joy.getBoundingClientRect();
-    const cx = rect.left + rect.width / 2;
-    const cy = rect.top + rect.height / 2;
-    let x = (ev.clientX - cx) / (rect.width * .36);
-    let y = (ev.clientY - cy) / (rect.height * .36);
-    const len = Math.hypot(x,y);
-    if(len > 1){ x /= len; y /= len; }
-    if(Math.hypot(x,y) < .12){ x = 0; y = 0; }
-    return {x,y};
-  }
-
-  function applyMovementAxis(x,y){
-    state.move.x = x; state.move.y = y;
-    emitKey('w', y < -.28);
-    emitKey('s', y > .28);
-    emitKey('a', x < -.28);
-    emitKey('d', x > .28);
-    moveKnob('csMoveJoy',x,y);
-  }
-
-  function releaseMovement(){
-    state.movePointer = null;
-    state.move.x = 0; state.move.y = 0;
-    ['w','a','s','d'].forEach(k => emitKey(k,false));
-    moveKnob('csMoveJoy',0,0);
-  }
-
-  function applyAimAxis(x,y,shooting){
-    const len = Math.hypot(x,y);
-    if(len > .12){
-      state.aim.x = x / len;
-      state.aim.y = y / len;
-      state.aim.angle = Math.atan2(state.aim.y,state.aim.x);
-    }
-    try {
-      if(hasGame() && typeof mouse !== 'undefined'){
-        const p = game.player;
-        mouse.x = p.x + Math.cos(state.aim.angle) * 1000;
-        mouse.y = p.y + Math.sin(state.aim.angle) * 1000;
-        mouse.down = !!shooting;
-      }
-    } catch {}
-    moveKnob('csAimJoy', len > .12 ? x : state.aim.x * .45, len > .12 ? y : state.aim.y * .45);
-  }
-
-  function releaseAim(){
-    state.aimPointer = null;
-    try { if(typeof mouse !== 'undefined') mouse.down = false; } catch {}
-    moveKnob('csAimJoy',0,0);
-  }
-
-  function tryShootNow(){
-    try { if(gameIsRunning() && typeof shoot === 'function') shoot(); } catch {}
-  }
-
-  function useMobileSkill(idx){
-    try { if(gameIsRunning() && typeof useSkill === 'function') useSkill(idx); } catch {}
-  }
-
-  function pressUltimate(){
-    if(!gameIsRunning()) return;
-    try {
-      window.dispatchEvent(new KeyboardEvent('keydown',{key:'x',code:'KeyX',bubbles:true,cancelable:true}));
-      window.dispatchEvent(new KeyboardEvent('keyup',{key:'x',code:'KeyX',bubbles:true,cancelable:true}));
-    } catch {}
-  }
-
-  function pressDash(){
-    if(!gameIsRunning()) return;
-    try { if(typeof startDash === 'function'){ startDash(); return; } } catch {}
-    emitKey('shift',true);
-    setTimeout(() => emitKey('shift',false),40);
-  }
-
-  function installMobileDom(){
-    if(byId('csMobileControls')) return;
-    const wrap = document.createElement('div');
-    wrap.id = 'csMobileControls';
-    wrap.className = 'cs-mobile-controls';
-    wrap.innerHTML = `
-      <div class="cs-joy" id="csMoveJoy" aria-label="Movimento">
-        <div class="cs-joy-knob"></div>
-        <span class="cs-joy-label">MOVER</span>
-      </div>
-      <div class="cs-joy" id="csAimJoy" aria-label="Mira e tiro">
-        <div class="cs-joy-knob"></div>
-        <span class="cs-joy-label">MIRAR / ATIRAR</span>
-      </div>
-      <button class="cs-dash-btn" id="csDashBtn" type="button">DASH</button>
-    `;
-    document.body.appendChild(wrap);
-
-    const moveJoy = byId('csMoveJoy');
-    const aimJoy = byId('csAimJoy');
-    const dashBtn = byId('csDashBtn');
-
-    moveJoy.addEventListener('pointerdown', ev => {
-      if(!canShowControls()) return;
-      ev.preventDefault();
-      state.movePointer = ev.pointerId;
-      moveJoy.setPointerCapture?.(ev.pointerId);
-      const a = axisFromPointer(moveJoy,ev);
-      applyMovementAxis(a.x,a.y);
-    });
-    moveJoy.addEventListener('pointermove', ev => {
-      if(ev.pointerId !== state.movePointer) return;
-      ev.preventDefault();
-      const a = axisFromPointer(moveJoy,ev);
-      applyMovementAxis(a.x,a.y);
-    });
-    ['pointerup','pointercancel','lostpointercapture'].forEach(type => moveJoy.addEventListener(type, releaseMovement));
-
-    aimJoy.addEventListener('pointerdown', ev => {
-      if(!canShowControls()) return;
-      ev.preventDefault();
-      state.aimPointer = ev.pointerId;
-      aimJoy.setPointerCapture?.(ev.pointerId);
-      const a = axisFromPointer(aimJoy,ev);
-      applyAimAxis(a.x,a.y,true);
-      tryShootNow();
-    });
-    aimJoy.addEventListener('pointermove', ev => {
-      if(ev.pointerId !== state.aimPointer) return;
-      ev.preventDefault();
-      const a = axisFromPointer(aimJoy,ev);
-      applyAimAxis(a.x,a.y,true);
-    });
-    ['pointerup','pointercancel','lostpointercapture'].forEach(type => aimJoy.addEventListener(type, releaseAim));
-
-    dashBtn.addEventListener('pointerdown', ev => {
-      if(!canShowControls()) return;
-      ev.preventDefault();
-      pressDash();
-    });
-  }
-
-  function skillIndexFromIcon(icon){
-    if(!icon) return -1;
-    const id = icon.id || '';
-    if(/skillIcon1/.test(id)) return 0;
-    if(/skillIcon2/.test(id)) return 1;
-    if(/skillIcon3/.test(id)) return 2;
-    if(/skillIcon4/.test(id)) return 3;
-    const hint = (icon.querySelector('.key-hint')?.textContent || '').trim().toLowerCase();
-    if(hint === 'e') return 0;
-    if(hint === 'q') return 1;
-    if(hint === 'r') return 2;
-    if(hint === 'x') return 99;
-    return -1;
-  }
-
-  function installSkillClicks(){
-    const bar = byId('skillBar');
-    if(!bar || bar.dataset.csMobileClicks === '1') return;
-    bar.dataset.csMobileClicks = '1';
-    bar.addEventListener('pointerdown', ev => {
-      if(!canShowControls()) return;
-      const icon = ev.target.closest?.('.skill-icon');
-      if(!icon || !bar.contains(icon)) return;
-      ev.preventDefault();
-      ev.stopPropagation();
-      const idx = skillIndexFromIcon(icon);
-      if(idx === 99) pressUltimate();
-      else if(idx >= 0) useMobileSkill(idx);
-    }, true);
-  }
-
-  function syncTouchState(){
-    const active = canShowControls();
-    document.body.classList.toggle('cs-touch-playing', active);
-    if(!active && state.active){
-      releaseMovement();
-      releaseAim();
-    }
-    state.active = active;
-  }
-
-  function blockGestureDefaults(){
-    // Bloquear gestos de zoom e menu de contexto
-    document.addEventListener('gesturestart', ev => ev.preventDefault(), {passive:false});
-    document.addEventListener('contextmenu', ev => {
-      if(!ev.target.closest?.('.card,.overlay,#cs-install-banner')) ev.preventDefault();
-    });
-    document.addEventListener('selectstart', ev => {
-      if(!ev.target.closest?.('input')) ev.preventDefault();
-    });
-
-    // Bloquear scroll apenas fora de elementos de interface
-    document.addEventListener('touchmove', ev => {
-      if(!ev.target.closest?.('.card,.overlay,#cs-install-banner')) ev.preventDefault();
-    }, {passive:false});
-
-    // Bloquear zoom por pinça
-    document.addEventListener('touchstart', ev => {
-      if(ev.touches.length > 1) ev.preventDefault();
-    }, {passive:false});
-
-    // Bloquear double-tap zoom, mas permitir cliques rápidos em botões
-    let lastTap = 0;
-    document.addEventListener('touchend', ev => {
-      const now = Date.now();
-      if(now - lastTap < 300) {
-        if(!ev.target.closest?.('button, .card, .overlay, #cs-install-banner')) ev.preventDefault();
-      }
-      lastTap = now;
-    }, {passive:false});
-
-    const canvasEl = byId('game');
-    if(canvasEl){
-      canvasEl.addEventListener('touchstart', ev => {
-        // Permitir toque no canvas apenas se não houver overlay
-        if(overlayHidden()) ev.preventDefault();
-      }, {passive:false});
-    }
-  }
-
-  /* ── PWA SERVICE WORKER ── */
-  function registerPwaServiceWorker(){
-    if(!('serviceWorker' in navigator)) return;
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js')
-        .catch(err => console.warn('Chrono Shards PWA: falha no Service Worker', err));
-    });
-  }
-
-  function boot(){
-    installMobileDom();
-    installSkillClicks();
-    blockGestureDefaults();
-    syncTouchState();
-    setInterval(syncTouchState,180);
-    try {
-      new MutationObserver(() => { installSkillClicks(); syncTouchState(); })
-        .observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['class','style']});
-    } catch {}
-    registerPwaServiceWorker();
-  }
-
-  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
-  else boot();
-})();
-</script>
-
 <!-- ═══════════════════════════════════════════════════════════
      CHRONO SHARDS — PWA INSTALL BANNER
      Captura beforeinstallprompt e exibe botão de instalação
@@ -21568,15 +21150,16 @@ function removeTickets(){try{$('#powerTickets544')?.remove();$('#powerTickets548
 
   let isPaused = false;
   let wasRunning = false;
+  let lastPauseButtonVisible = null;
 
   /* Mostrar o botão de pausa apenas quando o jogo está rodando */
   function updatePauseButtonVisibility(){
-    if(game && game.running && !game.shopPending && !game.betweenWaves){
-      pauseBtn.classList.add('visible');
-    } else {
-      pauseBtn.classList.remove('visible');
-    }
+    const shouldShow=!!(game && game.running && !game.shopPending && !game.betweenWaves);
+    if(shouldShow===lastPauseButtonVisible)return;
+    lastPauseButtonVisible=shouldShow;
+    pauseBtn.classList.toggle('visible',shouldShow);
   }
+  window.__chronoUpdatePauseButtonVisibility=updatePauseButtonVisibility;
 
   /* Abrir o menu de pausa */
   function openPauseMenu(){
@@ -21635,15 +21218,8 @@ function removeTickets(){try{$('#powerTickets544')?.remove();$('#powerTickets548
     return null;
   })();
 
-  if(originalLoop){
-    window.loop = function(ts){
-      updatePauseButtonVisibility();
-      return originalLoop(ts);
-    };
-  } else {
-    /* Fallback: atualizar a cada 100ms */
-    setInterval(updatePauseButtonVisibility, 100);
-  }
+  // O loop principal chama o atualizador com dirty flag; nenhum polling separado é necessário.
+  updatePauseButtonVisibility();
 
   /* Expor funções globalmente se necessário */
   window.__pauseMenu = {
@@ -21654,226 +21230,18 @@ function removeTickets(){try{$('#powerTickets544')?.remove();$('#powerTickets548
 
 })();
 
-// ── HUD EDITOR SYSTEM ──
-(function(){
-  'use strict';
-  
-  const hudEditorOverlay = document.getElementById('hudEditorOverlay');
-  const hudEditorCanvas = document.getElementById('hudEditorCanvas');
-  const hudEditorCancel = document.getElementById('hudEditorCancel');
-  const hudEditorSave = document.getElementById('hudEditorSave');
-  
-  let hudLayout = {
-    skillIcon1: {x: 50, y: 80, w: 44, h: 44},
-    skillIcon2: {x: 110, y: 80, w: 44, h: 44},
-    skillIcon3: {x: 170, y: 80, w: 44, h: 44},
-    dashBtn: {x: 230, y: 80, w: 44, h: 44},
-    pauseBtn: {x: window.innerWidth - 60, y: 20, w: 40, h: 40}
-  };
-  
-  let tempLayout = JSON.parse(JSON.stringify(hudLayout));
-  let draggingButton = null;
-  let resizingButton = null;
-  let dragOffset = {x: 0, y: 0};
-  
-  // Carregar layout salvo do localStorage
-  function loadHudLayout(){
-    const saved = localStorage.getItem('chrono_hud_layout');
-    if(saved){
-      hudLayout = JSON.parse(saved);
-      tempLayout = JSON.parse(JSON.stringify(hudLayout));
-    }
-  }
-  
-  // Abrir editor de HUD — redirecionado para o novo mapper do patch v6.0
-  window.openHudEditor = function(){
-    // Se o novo mapper do patch v6.0 estiver disponível, usa ele
-    if(typeof window.openMobileButtonMapper === 'function'){
-      window.openMobileButtonMapper();
-      return;
-    }
-    // Fallback para o editor legado
-    tempLayout = JSON.parse(JSON.stringify(hudLayout));
-    if(hudEditorOverlay) hudEditorOverlay.classList.remove('hidden');
-    renderHudEditor();
-  };
-  
-  // Renderizar botões no editor
-  function renderHudEditor(){
-    hudEditorCanvas.innerHTML = '';
-    for(const [key, pos] of Object.entries(tempLayout)){
-      const btn = document.createElement('div');
-      btn.className = 'hud-editor-button';
-      btn.style.left = pos.x + 'px';
-      btn.style.top = pos.y + 'px';
-      btn.style.width = pos.w + 'px';
-      btn.style.height = pos.h + 'px';
-      btn.textContent = key === 'skillIcon1' ? '⚡' : key === 'skillIcon2' ? '🛡️' : key === 'skillIcon3' ? '🌀' : key === 'dashBtn' ? '💨' : '⏸';
-      btn.dataset.key = key;
-      
-      btn.addEventListener('mousedown', startDrag);
-      btn.addEventListener('dblclick', startResize);
-      
-      hudEditorCanvas.appendChild(btn);
-    }
-  }
-  
-  function startDrag(e){
-    if(e.button !== 0) return;
-    draggingButton = e.target.dataset.key;
-    const rect = e.target.getBoundingClientRect();
-    dragOffset.x = e.clientX - rect.left;
-    dragOffset.y = e.clientY - rect.top;
-    e.target.classList.add('dragging');
-    document.addEventListener('mousemove', doDrag);
-    document.addEventListener('mouseup', stopDrag);
-  }
-  
-  function doDrag(e){
-    if(!draggingButton) return;
-    const canvasRect = hudEditorCanvas.getBoundingClientRect();
-    let x = e.clientX - canvasRect.left - dragOffset.x;
-    let y = e.clientY - canvasRect.top - dragOffset.y;
-    
-    x = Math.max(0, Math.min(x, canvasRect.width - tempLayout[draggingButton].w));
-    y = Math.max(0, Math.min(y, canvasRect.height - tempLayout[draggingButton].h));
-    
-    tempLayout[draggingButton].x = x;
-    tempLayout[draggingButton].y = y;
-    renderHudEditor();
-  }
-  
-  function stopDrag(){
-    if(draggingButton){
-      document.querySelector(`[data-key="${draggingButton}"]`).classList.remove('dragging');
-    }
-    draggingButton = null;
-    document.removeEventListener('mousemove', doDrag);
-    document.removeEventListener('mouseup', stopDrag);
-  }
-  
-  function startResize(e){
-    resizingButton = e.target.dataset.key;
-    const initialW = tempLayout[resizingButton].w;
-    const initialH = tempLayout[resizingButton].h;
-    const startX = e.clientX;
-    const startY = e.clientY;
-    
-    function doResize(e){
-      const deltaX = e.clientX - startX;
-      const deltaY = e.clientY - startY;
-      tempLayout[resizingButton].w = Math.max(30, initialW + deltaX);
-      tempLayout[resizingButton].h = Math.max(30, initialH + deltaY);
-      renderHudEditor();
-    }
-    
-    function stopResize(){
-      resizingButton = null;
-      document.removeEventListener('mousemove', doResize);
-      document.removeEventListener('mouseup', stopResize);
-    }
-    
-    document.addEventListener('mousemove', doResize);
-    document.addEventListener('mouseup', stopResize);
-  }
-  
-  hudEditorCancel.addEventListener('click', () => {
-    hudEditorOverlay.classList.add('hidden');
-    // Cancelar volta ao menu principal
-    try {
-      if (typeof window.openStartMenu === 'function') window.openStartMenu();
-      else if (typeof openStartMenu461 === 'function') openStartMenu461();
-    } catch {}
-  });
-  
-  hudEditorSave.addEventListener('click', () => {
-    hudLayout = JSON.parse(JSON.stringify(tempLayout));
-    localStorage.setItem('chrono_hud_layout', JSON.stringify(hudLayout));
-    hudEditorOverlay.classList.add('hidden');
-    // Aplicar novo layout aos botões em tempo real
-    applyHudLayout();
-    // Salvar também volta ao menu principal
-    try {
-      if (typeof window.openStartMenu === 'function') window.openStartMenu();
-      else if (typeof openStartMenu461 === 'function') openStartMenu461();
-    } catch {}
-  });
-  
-  function applyHudLayout(){
-    const skillIcon1 = document.getElementById('skillIcon1');
-    const skillIcon2 = document.getElementById('skillIcon2');
-    const skillIcon3 = document.getElementById('skillIcon3');
-    const pauseBtn = document.getElementById('pauseBtn');
-    
-    if(skillIcon1 && hudLayout.skillIcon1){
-      skillIcon1.style.position = 'fixed';
-      skillIcon1.style.left = hudLayout.skillIcon1.x + 'px';
-      skillIcon1.style.top = hudLayout.skillIcon1.y + 'px';
-      skillIcon1.style.width = hudLayout.skillIcon1.w + 'px';
-      skillIcon1.style.height = hudLayout.skillIcon1.h + 'px';
-    }
-    if(skillIcon2 && hudLayout.skillIcon2){
-      skillIcon2.style.position = 'fixed';
-      skillIcon2.style.left = hudLayout.skillIcon2.x + 'px';
-      skillIcon2.style.top = hudLayout.skillIcon2.y + 'px';
-      skillIcon2.style.width = hudLayout.skillIcon2.w + 'px';
-      skillIcon2.style.height = hudLayout.skillIcon2.h + 'px';
-    }
-    if(skillIcon3 && hudLayout.skillIcon3){
-      skillIcon3.style.position = 'fixed';
-      skillIcon3.style.left = hudLayout.skillIcon3.x + 'px';
-      skillIcon3.style.top = hudLayout.skillIcon3.y + 'px';
-      skillIcon3.style.width = hudLayout.skillIcon3.w + 'px';
-      skillIcon3.style.height = hudLayout.skillIcon3.h + 'px';
-    }
-    if(pauseBtn && hudLayout.pauseBtn){
-      pauseBtn.style.top = hudLayout.pauseBtn.y + 'px';
-      pauseBtn.style.right = (window.innerWidth - hudLayout.pauseBtn.x - hudLayout.pauseBtn.w) + 'px';
-    }
-  }
-  
-  loadHudLayout();
-  applyHudLayout();
-  window.addEventListener('resize', applyHudLayout);
-  
-  window.__hudEditor = {
-    open: () => window.openHudEditor(),
-    getLayout: () => hudLayout
-  };
-})();
-
-
-// Limpeza periódica de memória (a cada 30 segundos)
-setInterval(() => {
-  if(game && game.particles){
-    // Remover partículas mortas
-    game.particles = game.particles.filter(p => p.life > 0);
-  }
-  if(game && game.bullets){
-    // Remover projéteis fora da tela
-    game.bullets = game.bullets.filter(b => {
-      if(b.x < -100 || b.x > W+100 || b.y < -100 || b.y > H+100){
-        ObjectPool.return('bullet', b);
-        return false;
-      }
-      return true;
-    });
-  }
-}, 30000);
-
-// Otimização: Usar transform3d para melhor performance
-document.body.style.willChange = 'transform';
-canvas.style.willChange = 'transform';
+// O editor HUD legado foi removido. O mapper v6.1 é a única fonte de layout mobile.
+// Também foram removidos o pool não utilizado, a limpeza de 30 s e will-change no body.
 
 </script>
 
 
 <!-- ╔════════════════════════════════════════════════════════════════════╗ -->
-<!-- ║   CHRONO SHARDS — MOBILE FINAL OVERRIDE v6.0                     ║ -->
+<!-- ║   CHRONO SHARDS — MOBILE CONSOLIDADO v6.1                     ║ -->
 <!-- ║   Escalonamento real, mapeamento de botões e otimização mobile    ║ -->
 <!-- ╚════════════════════════════════════════════════════════════════════╝ -->
 
-<style id="chronoMobileFinalOverride600">
+<style id="chronoMobileFinalStyles610">
   :root{
     --cs-vh:100dvh;
     --cs-safe-top:env(safe-area-inset-top,0px);
@@ -22226,15 +21594,18 @@ canvas.style.willChange = 'transform';
       margin-bottom:6px!important;
     }
   }
+
+  body.cs-mobile-runtime canvas#game{contain:layout paint size;touch-action:none;}
+  body.cs-mobile-runtime .cs-joy,body.cs-mobile-runtime .cs-dash-btn,body.cs-mobile-runtime .cs-ultimate-mobile-btn{touch-action:none;user-select:none;-webkit-user-select:none;}
 </style>
 
-<script id="chronoMobileFinalOverride600">
+<script id="chronoMobileFinalOverride610">
 (() => {
   'use strict';
-  if (window.__chronoMobileFinalOverride600) return;
-  window.__chronoMobileFinalOverride600 = true;
+  if (window.__chronoMobileFinalOverride610) return;
+  window.__chronoMobileFinalOverride610 = true;
 
-  const PATCH = 'Chrono Shards Mobile Final v6.0';
+  const PATCH = 'Chrono Shards Mobile Consolidado v6.1';
   const LAYOUT_KEY = 'chrono_mobile_button_map_v6';
   const SIZE_KEY = 'chrono_mobile_button_scale_v6';
   const canvasEl = document.getElementById('game');
@@ -22276,7 +21647,11 @@ canvas.style.willChange = 'transform';
     } catch {}
     return 780;
   }
-  function activeDpr(){ return mobileRuntime() ? Math.min(1.45, window.devicePixelRatio || 1) : Math.min(2, window.devicePixelRatio || 1); }
+  function activeDpr(){
+    const dpr=Math.max(1,window.devicePixelRatio||1);
+    if(!mobileRuntime()) return Math.min(2,dpr);
+    return Math.min(lowGfxEnabled()?1:1.30,dpr);
+  }
 
   function syncViewportVar(){ document.documentElement.style.setProperty('--cs-vh', visualH() + 'px'); }
 
@@ -22303,7 +21678,7 @@ canvas.style.willChange = 'transform';
     // Sempre usar a resolução lógica fixa do jogo (1360x780).
     // O DPR real é usado para o buffer de pixels (nitidez), mas limitado
     // para não desperdiçar memória em telas de alta densidade.
-    const dpr = Math.min(window.devicePixelRatio || 1, mobileRuntime() ? 2 : 2);
+    const dpr = activeDpr();
     const desiredW = Math.max(1, Math.round(GAME_W * dpr));
     const desiredH = Math.max(1, Math.round(GAME_H * dpr));
     if (canvasEl.width !== desiredW || canvasEl.height !== desiredH) {
@@ -22332,12 +21707,10 @@ canvas.style.willChange = 'transform';
     if (hud) hud.style.width = cssW + 'px';
     if (gameShell) { gameShell.style.width = '100vw'; gameShell.style.height = 'var(--cs-vh)'; }
     resizeBackground();
-    // Sincronizar mouse com centro da arena após resize para evitar mira fora da tela
+    // Preservar a direção lógica da mira após resize/orientação.
     try {
-      if (typeof mouse !== 'undefined' && !mouse.down) {
-        mouse.x = GAME_W / 2;
-        mouse.y = GAME_H / 2;
-      }
+      if(getGame()?.player) updateAimCoordinates(!!mouse?.down);
+      else if(typeof mouse!=='undefined'&&!mouse.down){mouse.x=GAME_W/2;mouse.y=GAME_H/2;}
     } catch {}
   }
 
@@ -22366,9 +21739,25 @@ canvas.style.willChange = 'transform';
 
   function canShowControls(){ return hasPointerTouch() && isRunning() && overlayHidden() && !byId('csButtonMapperOverlay')?.classList.contains('visible'); }
 
+  const AIM_VISUAL_RADIUS = 118;
+  const AIM_TARGET_DISTANCE = 1600;
   const controlState = {
     movePointer:null, aimPointer:null, move:{x:0,y:0}, aim:{x:1,y:0,angle:0}, keyState:Object.create(null)
   };
+  const aimVisual = window.__chronoAimState = {active:false,visualX:GAME_W/2,visualY:GAME_H/2,targetX:GAME_W/2,targetY:GAME_H/2,angle:0};
+
+  function updateAimCoordinates(shooting=false){
+    const g=getGame(), p=g?.player;
+    if(!p || typeof mouse==='undefined') return;
+    const dx=Math.cos(controlState.aim.angle), dy=Math.sin(controlState.aim.angle);
+    aimVisual.active=true; aimVisual.angle=controlState.aim.angle;
+    aimVisual.targetX=p.x+dx*AIM_TARGET_DISTANCE;
+    aimVisual.targetY=p.y+dy*AIM_TARGET_DISTANCE;
+    const margin=24;
+    aimVisual.visualX=clamp(p.x+dx*AIM_VISUAL_RADIUS,margin,GAME_W-margin);
+    aimVisual.visualY=clamp(p.y+dy*AIM_VISUAL_RADIUS,margin,GAME_H-margin);
+    mouse.x=aimVisual.targetX; mouse.y=aimVisual.targetY; mouse.down=!!shooting;
+  }
 
   function emitKey(key, down){
     const normalized = String(key).toLowerCase();
@@ -22409,18 +21798,18 @@ canvas.style.willChange = 'transform';
   }
   function applyAimAxis(x,y,shooting){
     const len = Math.hypot(x,y);
-    if (len > .10) { controlState.aim.x = x / len; controlState.aim.y = y / len; controlState.aim.angle = Math.atan2(controlState.aim.y, controlState.aim.x); }
-    try {
-      if (typeof mouse !== 'undefined' && getGame()?.player) {
-        const p = getGame().player;
-        mouse.x = p.x + Math.cos(controlState.aim.angle) * Math.max(GAME_W, GAME_H);
-        mouse.y = p.y + Math.sin(controlState.aim.angle) * Math.max(GAME_W, GAME_H);
-        mouse.down = !!shooting;
-      }
-    } catch {}
+    if (len > .10) {
+      controlState.aim.x=x/len; controlState.aim.y=y/len;
+      controlState.aim.angle=Math.atan2(controlState.aim.y,controlState.aim.x);
+    }
+    try { updateAimCoordinates(shooting); } catch {}
     moveKnob('csAimJoy', len > .10 ? x : controlState.aim.x * .45, len > .10 ? y : controlState.aim.y * .45);
   }
-  function releaseAim(){ controlState.aimPointer = null; try { if (typeof mouse !== 'undefined') mouse.down = false; } catch {}; moveKnob('csAimJoy',0,0); }
+  function releaseAim(){
+    controlState.aimPointer=null;
+    try { updateAimCoordinates(false); } catch {}
+    moveKnob('csAimJoy',0,0);
+  }
   function fireOnce(){ try { if (isRunning() && typeof shoot === 'function') shoot(); } catch {} }
   function dash(){ try { if (isRunning() && typeof startDash === 'function') { startDash(); return; } } catch {}; emitKey('shift', true); setTimeout(() => emitKey('shift', false), 45); }
   function skill(idx){ try { if (isRunning() && typeof useSkill === 'function') useSkill(idx); } catch {} }
@@ -22454,13 +21843,13 @@ canvas.style.willChange = 'transform';
     const moveJoy = byId('csMoveJoy'), aimJoy = byId('csAimJoy'), dashBtn = byId('csDashBtn'), ultBtn = byId('csUltimateMobileBtn');
     if (moveJoy && moveJoy.dataset.csFinal !== '1') {
       moveJoy.dataset.csFinal = '1';
-      moveJoy.addEventListener('pointerdown', ev => { if(!canShowControls()) return; controlState.movePointer=ev.pointerId; moveJoy.setPointerCapture?.(ev.pointerId); const a=pointerAxis(moveJoy,ev); applyMoveAxis(a.x,a.y); }, {passive:true});
+      moveJoy.addEventListener('pointerdown', ev => { if(!canShowControls()) return; controlState.movePointer=ev.pointerId; try{moveJoy.setPointerCapture?.(ev.pointerId);}catch{} const a=pointerAxis(moveJoy,ev); applyMoveAxis(a.x,a.y); }, {passive:true});
       moveJoy.addEventListener('pointermove', ev => { if(ev.pointerId!==controlState.movePointer) return; const a=pointerAxis(moveJoy,ev); applyMoveAxis(a.x,a.y); }, {passive:true});
       ['pointerup','pointercancel','lostpointercapture'].forEach(t => moveJoy.addEventListener(t, releaseMove));
     }
     if (aimJoy && aimJoy.dataset.csFinal !== '1') {
       aimJoy.dataset.csFinal = '1';
-      aimJoy.addEventListener('pointerdown', ev => { if(!canShowControls()) return; controlState.aimPointer=ev.pointerId; aimJoy.setPointerCapture?.(ev.pointerId); const a=pointerAxis(aimJoy,ev); applyAimAxis(a.x,a.y,true); fireOnce(); }, {passive:true});
+      aimJoy.addEventListener('pointerdown', ev => { if(!canShowControls()) return; controlState.aimPointer=ev.pointerId; try{aimJoy.setPointerCapture?.(ev.pointerId);}catch{} const a=pointerAxis(aimJoy,ev); applyAimAxis(a.x,a.y,true); fireOnce(); }, {passive:true});
       aimJoy.addEventListener('pointermove', ev => { if(ev.pointerId!==controlState.aimPointer) return; const a=pointerAxis(aimJoy,ev); applyAimAxis(a.x,a.y,true); }, {passive:true});
       ['pointerup','pointercancel','lostpointercapture'].forEach(t => aimJoy.addEventListener(t, releaseAim));
     }
@@ -22602,17 +21991,16 @@ canvas.style.willChange = 'transform';
     }
     renderItems();
 
-    if (sizeInput && sizeInput.dataset.bound !== '1') {
-      sizeInput.dataset.bound = '1';
-      sizeInput.addEventListener('input', () => {
+    if (sizeInput) {
+      sizeInput.oninput = () => {
         const old = readScale();
         const next = clamp(Number(sizeInput.value)/100, .72, 1.35);
-        const ratio = next / old;
+        const ratio = old>0 ? next/old : 1;
         saveScale(next);
-        for (const b of Object.values(temp)) { b.w = clamp(b.w * ratio, 30, 150); b.h = clamp(b.h * ratio, 30, 150); }
-        temp = sanitizeLayout(temp);
+        for (const b of Object.values(temp)) { b.w=clamp(b.w*ratio,30,150); b.h=clamp(b.h*ratio,30,150); }
+        temp=sanitizeLayout(temp);
         renderItems();
-      });
+      };
     }
     byId('csMapSave').onclick = () => {
       saveLayout(temp);
@@ -22695,48 +22083,67 @@ canvas.style.willChange = 'transform';
   }
 
   function lowGfxEnabled(){
-    try { const raw = localStorage.getItem(typeof SAVE_KEY !== 'undefined' ? SAVE_KEY : 'chrono_v4_meta'); return !!JSON.parse(raw || '{}').gfxLow; } catch { return false; }
+    try { const raw=localStorage.getItem(typeof SAVE_KEY!=='undefined'?SAVE_KEY:'chrono_v4_meta'); return !!JSON.parse(raw||'{}').gfxLow; } catch { return false; }
   }
-  function perfMode(){ return hasPointerTouch() || lowGfxEnabled() || visualW() * visualH() < 520000; }
-  function limitArray(arr, max){ if (Array.isArray(arr) && arr.length > max) arr.splice(0, arr.length - max); }
-  function optimizeLiveObjects(){
-    const g = getGame(); if (!g) return;
-    const mobile = perfMode();
-    limitArray(g.particles, mobile ? 180 : 420);
-    limitArray(g.rings, mobile ? 36 : 80);
-    limitArray(g.lightnings, mobile ? 24 : 70);
-    limitArray(g.floatingTexts, mobile ? 42 : 90);
-    limitArray(g.bullets, mobile ? 240 : 520);
-    limitArray(g.enemyBullets, mobile ? 220 : 460);
-    limitArray(g.shockwaves, mobile ? 28 : 70);
-    if (mobile && Number.isFinite(Number(g.shake))) g.shake = Math.min(Number(g.shake), 12);
-  }
+  function perfMode(){ return hasPointerTouch() || lowGfxEnabled() || visualW()*visualH()<520000; }
   function wrapEffects(){
     try {
-      const old = window.addParticles || addParticles;
-      if (typeof old === 'function' && !old.__csMobileOptimized) {
-        const wrapped = function(x,y,color,count,force){
-          let c = Number(count ?? 1);
-          if (perfMode()) c = Math.max(1, Math.ceil(c * (lowGfxEnabled() ? .24 : .55)));
+      const old=window.addParticles||addParticles;
+      if(typeof old==='function'&&!old.__csMobileOptimized){
+        const wrapped=function(x,y,color,count,force){
+          let c=Number(count??1);
+          const g=getGame();
+          if(perfMode()){
+            const cap=lowGfxEnabled()?100:190;
+            const room=Math.max(0,cap-(g?.particles?.length||0));
+            c=Math.min(room,Math.max(1,Math.ceil(c*(lowGfxEnabled()?.25:.55))));
+          }
+          if(c<=0)return;
           return old.call(this,x,y,color,c,force);
         };
-        wrapped.__csMobileOptimized = true;
-        window.addParticles = wrapped;
-        try { (0,eval)('addParticles=window.addParticles'); } catch {}
+        wrapped.__csMobileOptimized=true; window.addParticles=wrapped;
+        try{(0,eval)('addParticles=window.addParticles');}catch{}
       }
-    } catch {}
+    }catch{}
     try {
-      const oldRing = window.addRing || addRing;
-      if (typeof oldRing === 'function' && !oldRing.__csMobileOptimized) {
-        const wrappedRing = function(x,y,color,maxR,width){
-          if (perfMode()) { maxR = Number(maxR || 40) * .88; width = Math.max(1.5, Number(width || 3) * .78); }
+      const oldRing=window.addRing||addRing;
+      if(typeof oldRing==='function'&&!oldRing.__csMobileOptimized){
+        const wrappedRing=function(x,y,color,maxR,width){
+          const g=getGame();
+          if(perfMode()&&(g?.rings?.length||0)>=(lowGfxEnabled()?24:42))return;
+          if(perfMode()) width=Math.max(1.5,Number(width||3)*.82);
           return oldRing.call(this,x,y,color,maxR,width);
         };
-        wrappedRing.__csMobileOptimized = true;
-        window.addRing = wrappedRing;
-        try { (0,eval)('addRing=window.addRing'); } catch {}
+        wrappedRing.__csMobileOptimized=true; window.addRing=wrappedRing;
+        try{(0,eval)('addRing=window.addRing');}catch{}
       }
-    } catch {}
+    }catch{}
+  }
+
+  function installAimRuntime(){
+    let current=null;
+    try{current=window.updatePlayer||(typeof updatePlayer==='function'?updatePlayer:null);}catch{}
+    if(typeof current!=='function'||current.__csAimRuntime)return;
+    const wrapped=function(dt){
+      try{if(mobileRuntime()&&aimVisual.active)updateAimCoordinates(!!mouse?.down);}catch{}
+      return current.apply(this,arguments);
+    };
+    wrapped.__csAimRuntime=true; window.updatePlayer=wrapped;
+    try{(0,eval)('updatePlayer=window.updatePlayer');}catch{}
+  }
+
+  function installMobileCrosshair(){
+    let current=null;
+    try{current=window.drawCrosshair||(typeof drawCrosshair==='function'?drawCrosshair:null);}catch{}
+    if(typeof current!=='function'||current.__csFixedMobileAim)return;
+    const wrapped=function(){
+      if(!mobileRuntime()||!aimVisual.active||!getGame()?.player||typeof mouse==='undefined') return current.apply(this,arguments);
+      const ox=mouse.x,oy=mouse.y;
+      mouse.x=aimVisual.visualX; mouse.y=aimVisual.visualY;
+      try{return current.apply(this,arguments);}finally{mouse.x=ox;mouse.y=oy;}
+    };
+    wrapped.__csFixedMobileAim=true; window.drawCrosshair=wrapped;
+    try{(0,eval)('drawCrosshair=window.drawCrosshair');}catch{}
   }
 
   function syncControlsVisibility(){
@@ -22770,6 +22177,7 @@ canvas.style.willChange = 'transform';
         const result = _resetGame.apply(this, arguments);
         // Após resetGame, re-aplicar o fit e W/H corretos
         try { fitCanvasForScreen(); } catch {}
+        try { updateAimCoordinates(false); } catch {}
         try { syncControlsVisibility(); } catch {}
         return result;
       };
@@ -22777,19 +22185,31 @@ canvas.style.willChange = 'transform';
       try { window.resetGame = wrapped; (0,eval)('resetGame=window.resetGame'); } catch {}
     }
 
+    installAimRuntime();
+    installMobileCrosshair();
     scheduleFit();
     applySavedLayout();
     syncControlsVisibility();
-    setInterval(syncControlsVisibility, 160);
-    setInterval(optimizeLiveObjects, 240);
-    setInterval(() => { try { injectMapperIntoSettings(); } catch {} }, 800);
+
+    let uiQueued=false;
+    const queueUiSync=()=>{
+      if(uiQueued)return; uiQueued=true;
+      requestAnimationFrame(()=>{uiQueued=false;ensureControlsDom();bindMapperButtons();injectMapperIntoSettings();syncControlsVisibility();});
+    };
     window.addEventListener('resize', scheduleFit, {passive:true});
     window.visualViewport?.addEventListener('resize', scheduleFit, {passive:true});
     window.addEventListener('orientationchange', () => setTimeout(scheduleFit, 250), {passive:true});
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden)queueUiSync();},{passive:true});
     try {
-      new MutationObserver(() => { ensureControlsDom(); bindMapperButtons(); applySavedLayout(); syncControlsVisibility(); })
-        .observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['class','style']});
+      const observer=new MutationObserver(queueUiSync);
+      [document.body,byId('overlay'),byId('overlayCard'),byId('pauseMenu'),byId('pauseOverlay')].filter(Boolean).forEach(el=>{
+        observer.observe(el,{attributes:true,attributeFilter:['class'],childList:el===byId('overlayCard'),subtree:el===byId('overlayCard')});
+      });
     } catch {}
+
+    if('serviceWorker' in navigator && location.protocol!=='file:'){
+      window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(err=>console.warn('Service Worker indisponível',err)),{once:true});
+    }
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
@@ -22797,7 +22217,7 @@ canvas.style.willChange = 'transform';
 })();
 
 // CORRIGIDO: Registro duplicado de service worker removido para evitar comportamento de PWA
-// O SW principal ja e registrado no boot() do patch v6.0
+// O SW principal ja e registrado no boot() do patch v6.1
 </script>
 
 
