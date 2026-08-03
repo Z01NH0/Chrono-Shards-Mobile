@@ -72,8 +72,7 @@ canvas#game{
   box-shadow:0 0 40px rgba(80,140,255,0.10),inset 0 0 20px rgba(0,0,0,0.5);
   position:relative;z-index:2;cursor:none;
   /* GPU compositing: promove o canvas para a própria camada de GPU */
-  will-change:contents;
-  transform:translateZ(0);
+  will-change:auto;
   /* Bloquear comportamentos de navegador no canvas */
   -webkit-user-select:none;user-select:none;
   -webkit-touch-callout:none;
@@ -745,8 +744,92 @@ body.cs-touch-playing,body.cs-mobile-scaled{overscroll-behavior:none}
 
 </style>
 
+
+<style id="chrono-performance-css-620">
+@media (hover:none), (pointer:coarse){
+  canvas#game{will-change:auto!important;transform:none!important;box-shadow:0 0 22px rgba(80,140,255,.08),inset 0 0 12px rgba(0,0,0,.42)}
+  .skill-icon{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+}
+@media (prefers-reduced-motion:reduce){
+  .skill-icon,.main-btn,.duneBtn461{transition-duration:.01ms!important}
+}
+</style>
 </head>
 <body>
+<script id="chrono-performance-bootstrap">
+(() => {
+  'use strict';
+  if (window.__chronoObserverScheduler620 || typeof window.MutationObserver !== 'function') return;
+  window.__chronoObserverScheduler620 = true;
+
+  const NativeMutationObserver = window.MutationObserver;
+  const pending = new Set();
+  let flushHandle = 0;
+  let flushUsesTimeout = false;
+
+  function flushObservers(){
+    flushHandle = 0;
+    flushUsesTimeout = false;
+    const batch = Array.from(pending);
+    pending.clear();
+    for (const observer of batch) observer.__chronoFlush();
+  }
+  function scheduleFlush(){
+    if (flushHandle) return;
+    if (document.hidden) {
+      flushUsesTimeout = true;
+      flushHandle = setTimeout(flushObservers, 80);
+    } else {
+      flushHandle = requestAnimationFrame(flushObservers);
+    }
+  }
+
+  function ChronoMutationObserver(callback){
+    if (!(this instanceof ChronoMutationObserver)) throw new TypeError('MutationObserver must be constructed');
+    if (typeof callback !== 'function') throw new TypeError('MutationObserver callback must be a function');
+    this.__chronoCallback = callback;
+    this.__chronoRecords = [];
+    this.__chronoDeferred = false;
+    this.__chronoDisconnected = false;
+    const self = this;
+    this.__chronoNative = new NativeMutationObserver((records) => {
+      if (self.__chronoDisconnected) return;
+      if (!self.__chronoDeferred) {
+        callback(records, self);
+        return;
+      }
+      // The legacy UI observers do not inspect every record. Keep a bounded
+      // batch and run each observer at most once per rendered frame.
+      const room = Math.max(0, 120 - self.__chronoRecords.length);
+      if (room) self.__chronoRecords.push(...records.slice(-room));
+      pending.add(self);
+      scheduleFlush();
+    });
+  }
+  ChronoMutationObserver.prototype.observe = function(target, options){
+    this.__chronoDisconnected = false;
+    this.__chronoDeferred = !!(target === document.body && options && options.childList && options.subtree);
+    return this.__chronoNative.observe(target, options);
+  };
+  ChronoMutationObserver.prototype.disconnect = function(){
+    this.__chronoDisconnected = true;
+    pending.delete(this);
+    this.__chronoRecords.length = 0;
+    return this.__chronoNative.disconnect();
+  };
+  ChronoMutationObserver.prototype.takeRecords = function(){
+    const queued = this.__chronoRecords.splice(0);
+    return queued.concat(this.__chronoNative.takeRecords());
+  };
+  ChronoMutationObserver.prototype.__chronoFlush = function(){
+    if (this.__chronoDisconnected) return;
+    const records = this.takeRecords();
+    if (records.length) this.__chronoCallback(records, this);
+  };
+  Object.defineProperty(ChronoMutationObserver, 'name', {value:'MutationObserver'});
+  window.MutationObserver = ChronoMutationObserver;
+})();
+</script>
 <canvas id="bg-canvas"></canvas>
 <div class="game-shell">
 <div class="hud">
@@ -822,18 +905,28 @@ const stars = Array.from({length:200},()=>({
   sp:Math.random()*0.02+0.005
 }));
 let _bgLastFrame=0;
+let _bgGradient=null,_bgGradientW=0,_bgGradientH=0;
 function drawBG(ts=0){
   requestAnimationFrame(drawBG);
-  if(ts-_bgLastFrame<42) return;
+  let gameplayVisible=false;
+  try{ gameplayVisible=!!(game&&game.running&&document.getElementById('overlay')?.classList.contains('hidden')); }catch{}
+  // The star field sits behind the gameplay canvas. During combat it only
+  // needs a subtle refresh, not a full 24 FPS redraw.
+  const interval=gameplayVisible?84:42;
+  if(document.hidden||ts-_bgLastFrame<interval) return;
   _bgLastFrame=ts;
-  bgX.clearRect(0,0,bgC.width,bgC.height);
-  const g=bgX.createRadialGradient(bgC.width/2,bgC.height/2,80,bgC.width/2,bgC.height/2,Math.max(bgC.width,bgC.height)*0.7);
-  g.addColorStop(0,'#0a0d1e'); g.addColorStop(1,'#020408');
-  bgX.fillStyle=g; bgX.fillRect(0,0,bgC.width,bgC.height);
-  for(const s of stars){
-    s.t+=s.sp; const a=0.3+Math.sin(s.t)*0.3;
-    bgX.globalAlpha=a; bgX.fillStyle='#a0c4ff';
-    bgX.beginPath(); bgX.arc(s.x,s.y,s.r,0,Math.PI*2); bgX.fill();
+  const w=bgC.width,h=bgC.height;
+  bgX.clearRect(0,0,w,h);
+  if(!_bgGradient||_bgGradientW!==w||_bgGradientH!==h){
+    _bgGradient=bgX.createRadialGradient(w/2,h/2,80,w/2,h/2,Math.max(w,h)*0.7);
+    _bgGradient.addColorStop(0,'#0a0d1e');_bgGradient.addColorStop(1,'#020408');
+    _bgGradientW=w;_bgGradientH=h;
+  }
+  bgX.globalAlpha=1;bgX.fillStyle=_bgGradient;bgX.fillRect(0,0,w,h);
+  bgX.fillStyle='#a0c4ff';
+  for(const star of stars){
+    star.t+=star.sp;bgX.globalAlpha=0.3+Math.sin(star.t)*0.3;
+    bgX.beginPath();bgX.arc(star.x,star.y,star.r,0,Math.PI*2);bgX.fill();
   }
   bgX.globalAlpha=1;
 }
@@ -1034,8 +1127,12 @@ const circleCollide=(a,b)=>{const dx=a.x-b.x,dy=a.y-b.y,r=a.r+b.r;return dx*dx+d
 // Reduz o custo normal de colisão de projéteis × todos os inimigos.
 const _ENEMY_GRID_CELL = 112;
 const _enemySpatialGrid = new Map();
+const _enemySpatialCellPool = [];
+let _enemySpatialCellCount = 0;
 let _enemySpatialMaxRadius = 64;
 function rebuildEnemySpatialGrid(){
+  for(let i=0;i<_enemySpatialCellCount;i++) _enemySpatialCellPool[i].length=0;
+  _enemySpatialCellCount=0;
   _enemySpatialGrid.clear();
   _enemySpatialMaxRadius = 32;
   if(!game || !Array.isArray(game.enemies)) return;
@@ -1045,7 +1142,11 @@ function rebuildEnemySpatialGrid(){
     const cx=Math.floor(e.x/_ENEMY_GRID_CELL), cy=Math.floor(e.y/_ENEMY_GRID_CELL);
     const key=cx+','+cy;
     let cell=_enemySpatialGrid.get(key);
-    if(!cell){cell=[];_enemySpatialGrid.set(key,cell);}
+    if(!cell){
+      cell=_enemySpatialCellPool[_enemySpatialCellCount]||(_enemySpatialCellPool[_enemySpatialCellCount]=[]);
+      _enemySpatialCellCount++;
+      _enemySpatialGrid.set(key,cell);
+    }
     cell.push(e);
   }
 }
@@ -1054,10 +1155,18 @@ function nearbyEnemiesSpatial(obj, extraRadius=0){
   const reach=(Number(obj.r)||0)+Math.max(0,Number(extraRadius)||0)+_enemySpatialMaxRadius;
   const minX=Math.floor((obj.x-reach)/_ENEMY_GRID_CELL), maxX=Math.floor((obj.x+reach)/_ENEMY_GRID_CELL);
   const minY=Math.floor((obj.y-reach)/_ENEMY_GRID_CELL), maxY=Math.floor((obj.y+reach)/_ENEMY_GRID_CELL);
-  const out=[];
+  // Projectile-local scratch arrays avoid one allocation per projectile/frame.
+  // Separate normal/wide buffers keep the nested explosive query safe.
+  const scratchKey=extraRadius>0?'__chronoNearbyWide':'__chronoNearbyNormal';
+  let out;
+  try{
+    out=obj[scratchKey];
+    if(!out) Object.defineProperty(obj,scratchKey,{value:(out=[]),configurable:true});
+    else out.length=0;
+  }catch{out=[];}
   for(let cy=minY;cy<=maxY;cy++) for(let cx=minX;cx<=maxX;cx++){
     const cell=_enemySpatialGrid.get(cx+','+cy);
-    if(cell) out.push(...cell);
+    if(cell) for(let i=0;i<cell.length;i++) out.push(cell[i]);
   }
   return out;
 }
@@ -2637,35 +2746,35 @@ function drawLoot(){
   }
 }
 
+const _particleBuckets = new Map();
+let _particleBucketSweep = 0;
 function drawParticles(){
-  const p=game.particles;
-  if(!p.length) return;
-  // Agrupar por cor para minimizar mudanças de estado do contexto
-  // (troca de fillStyle e globalAlpha são caras)
-  const byColor = {};
-  for(let i=0;i<p.length;i++){
-    const pt=p[i];
+  const particles=game.particles;
+  if(!particles.length) return;
+  for(const bucket of _particleBuckets.values()) bucket.length=0;
+  for(let i=0;i<particles.length;i++){
+    const pt=particles[i];
     if(pt.life<=0) continue;
-    const key=pt.color;
-    if(!byColor[key]) byColor[key]=[];
-    byColor[key].push(pt);
+    let bucket=_particleBuckets.get(pt.color);
+    if(!bucket){bucket=[];_particleBuckets.set(pt.color,bucket);}
+    bucket.push(pt);
   }
   ctx.save();
-  // Sem shadowBlur em partículas — é o maior custo no mobile
   ctx.shadowBlur=0;
-  for(const color in byColor){
-    const group=byColor[color];
+  for(const [color,group] of _particleBuckets){
+    if(!group.length) continue;
     ctx.fillStyle=color;
     for(let i=0;i<group.length;i++){
       const pt=group[i];
-      const alpha=clamp(pt.life/pt.maxLife,0,1);
-      ctx.globalAlpha=alpha;
-      ctx.beginPath();
-      ctx.arc(pt.x,pt.y,pt.size,0,Math.PI*2);
-      ctx.fill();
+      ctx.globalAlpha=clamp(pt.life/pt.maxLife,0,1);
+      ctx.beginPath();ctx.arc(pt.x,pt.y,pt.size,0,Math.PI*2);ctx.fill();
     }
   }
+  ctx.globalAlpha=1;
   ctx.restore();
+  if((++_particleBucketSweep&255)===0&&_particleBuckets.size>48){
+    for(const [color,group] of _particleBuckets) if(!group.length) _particleBuckets.delete(color);
+  }
 }
 
 function drawRings(){
@@ -2674,10 +2783,12 @@ function drawRings(){
   ctx.save();
   for(let i=0;i<rng.length;i++){
     const r=rng[i];
-    ctx.globalAlpha=r.life/r.maxLife;
+    const radius=Math.max(0,Number(r.r)||0);
+    if(radius<=0)continue;
+    ctx.globalAlpha=clamp(r.life/r.maxLife,0,1);
     ctx.strokeStyle=r.color;
-    ctx.lineWidth=r.width;
-    ctx.beginPath();ctx.arc(r.x,r.y,r.r,0,Math.PI*2);ctx.stroke();
+    ctx.lineWidth=Math.max(.5,Number(r.width)||1);
+    ctx.beginPath();ctx.arc(r.x,r.y,radius,0,Math.PI*2);ctx.stroke();
   }
   ctx.restore();
 }
@@ -2881,7 +2992,7 @@ function loop(ts){
   if(_loopPaused || !game) return;
   let dt=(ts-last)/1000||0;last=ts;
   // Mobile: cap mais agressivo para evitar espirais de morte de frame
-  dt=Math.min(dt, _isMobilePerf() ? 0.025 : 0.033);
+  dt=Math.min(dt, _isMobilePerf() ? 0.040 : 0.050);
 
   if(game.running){
     game.time+=dt;
@@ -4564,6 +4675,7 @@ render = function(){
         if(t){t.hp-=4*game.upgrades.damage;t.hitFlash=0.06;addLightning(b.x,b.y,t.x,t.y,'#9ff8ff')}
       }
       if((b.weaponKey==='acid'||b.poison)&&Math.random()<0.06){game.hazards.push({type:'poisonCloud',x:b.x,y:b.y,r:32,pulse:0,life:1.5,damageCd:0})}
+      let bulletRemoved=false;
       for(const e of nearbyEnemiesSpatial(b)){
         const j=game.enemies.indexOf(e);
         if(j<0 || !circleCollide(b,e)) continue;
@@ -4591,11 +4703,16 @@ render = function(){
             const k=game.enemies.indexOf(ek);
             if(k>=0&&k!==j&&dist(b,ek)<55&&!(typeof lineBlockedByMap==='function'&&lineBlockedByMap(b,ek,3))){ek.hp-=dmg*0.4;ek.hitFlash=0.08;if(ek.hp<=0) enemyDeath(k,ek);}
           }
-          game.bullets.splice(i,1);
+          const liveIndex=game.bullets.indexOf(b);
+          if(liveIndex>=0) game.bullets.splice(liveIndex,1);
+          bulletRemoved=true;
         }
         if(e.hp<=0) enemyDeath(j,e);
         b.pierce--;
-        if(b.pierce<0){if(game.bullets[i]) game.bullets.splice(i,1);break}
+        if(bulletRemoved||b.pierce<0){
+          if(!bulletRemoved){const liveIndex=game.bullets.indexOf(b);if(liveIndex>=0)game.bullets.splice(liveIndex,1);}
+          break;
+        }
       }
     }
   };
@@ -12323,7 +12440,7 @@ function killKey37(e){
     document.getElementById('awakBack480').onclick=()=>{if(typeof openMissions461==='function')openMissions461();};
   }
   window.enhanceMissions480=function enhanceMissions(){const grid=overlayCard.querySelector('.awakGrid461');if(!grid)return;grid.querySelectorAll('[data-awak461]').forEach(card=>{const id=card.dataset.awak461;card.removeAttribute('data-awak461');card.dataset.awak480=id;card.onclick=e=>{e.preventDefault();e.stopPropagation();openAwakening480(id)};const prog=completed(id);const ult=isUltUnlocked(id);const sp=card.querySelector('span:nth-last-child(2)');if(sp)sp.textContent=ult?'Ultimate liberada':`Progresso: ${Math.min(prog,5)}/5 etapas`;});if(!grid.querySelector('[data-awak480="archer"]')){const a=AWAKEN_480.archer,done=completed('archer'),ult=isUltUnlocked('archer');const btn=document.createElement('button');btn.className='awakCard461';btn.dataset.awak480='archer';btn.style.setProperty('--c',a.color);btn.innerHTML=`<div class="awakPortrait461">${a.emoji}</div><span class="badge461" style="--co:${a.color}">AWAKENING</span><strong>Desbloqueie a Ultimate do ${a.name}!</strong><span>${ult?'Ultimate liberada':`Progresso: ${Math.min(done,5)}/5 etapas`}</span><div class="progress461" style="--co:${a.color}"><i style="width:${Math.min(100,done/5*100)}%"></i></div>`;btn.onclick=()=>openAwakening480('archer');grid.appendChild(btn);} }
-  const openMissionsPrev480=(typeof openMissions461==='function'?openMissions461:(window.openMissions461||(typeof openMissions==='function'?openMissions:null)));window.openMissions461=openMissions461=function(){if(openMissionsPrev480)openMissionsPrev480();setTimeout(enhanceMissions,0);};try{window.openMissions=openMissions461;}catch{}
+  const openMissionsPrev480=(typeof openMissions461==='function'?openMissions461:(window.openMissions461||(typeof openMissions==='function'?openMissions:null)));window.openMissions461=openMissions461=function(){if(openMissionsPrev480)openMissionsPrev480();setTimeout(()=>window.enhanceMissions480?.(),0);};try{window.openMissions=openMissions461;}catch{}
   function addBomberCard(){const groups=[...overlayCard.querySelectorAll('.classGroup461')];let group=groups.find(g=>/T[ÁA]TICOS/i.test(g.textContent||''));if(!group)return;const grid=group.querySelector('.classGrid461');if(!grid||grid.querySelector('[data-card461="bomber"]'))return;const c=CLASSES.bomber,co=BOMB,m=read(),un=unlockedClass('bomber'),cost=COSTS_480.bomber,afford=m.relicShards>=cost;const card=document.createElement('div');card.className=`classCard461 bomber480 ${un?'':'locked'}`;card.dataset.card461='bomber';card.style.setProperty('--c',co);card.innerHTML=`<button class="classInfo461" data-info461="bomber" title="Informações">i</button>${un?'':'<div class="classLock461">🔒</div>'}<div class="modelBox461"><div class="heroModel461" data-hero="bomber" style="--c:${co}"><i></i><b></b><em></em></div></div><span class="badge461" style="--co:${co}">${esc(c.tag)}</span><strong>${esc(c.name)}</strong><span>${esc(c.desc)}</span><span class="small461">HP ${c.hp} • Escudo ${c.shield} • Foco ${c.focus} • ${esc(WEAPONS[c.weapon]?.name||c.weapon)}</span>${un?'<button class="pick461" data-pick461="bomber">Selecionar</button>':`<button class="buy461" data-buy461="bomber" ${afford?'':'disabled'}>Comprar — ${cost} 🜂 Relíquias</button>`}`;grid.appendChild(card);}
   function enhanceClassMenu(){addBomberCard();overlayCard.querySelectorAll('[data-info461]').forEach(b=>{const id=b.dataset.info461;b.onclick=e=>{e.preventDefault();e.stopPropagation();openClassInfo480(id)}});overlayCard.querySelectorAll('[data-pick461]').forEach(b=>{b.onclick=e=>{e.preventDefault();e.stopPropagation();resetGame(b.dataset.pick461);overlay.classList.add('hidden')}});overlayCard.querySelectorAll('[data-buy461]').forEach(b=>{if(b.dataset.buy461==='bomber')b.onclick=e=>{e.preventDefault();e.stopPropagation();if(!spendRelics(COSTS_480.bomber))return;const u=unlocks();u.push('bomber');saveUnlocks(u);openClassMenu461();}});overlayCard.querySelectorAll('[data-card461]').forEach(card=>{if(card.dataset.card461==='bomber')card.onclick=e=>{if(e.target.closest('button'))return;if(unlockedClass('bomber')){resetGame('bomber');overlay.classList.add('hidden');}}});}
   const openClassPrev480=(typeof openClassMenu461==='function'?openClassMenu461:(window.openClassMenu||(typeof openClassMenu==='function'?openClassMenu:null)));window.openClassMenu=openClassMenu461=function(){if(openClassPrev480)openClassPrev480();setTimeout(enhanceClassMenu,0);};try{openClassMenu=openClassMenu461;}catch{}
@@ -21605,7 +21722,7 @@ function removeTickets(){try{$('#powerTickets544')?.remove();$('#powerTickets548
   if (window.__chronoMobileFinalOverride610) return;
   window.__chronoMobileFinalOverride610 = true;
 
-  const PATCH = 'Chrono Shards Mobile Consolidado v6.1';
+  const PATCH = 'Chrono Shards Mobile Consolidado v6.2 — Performance';
   const LAYOUT_KEY = 'chrono_mobile_button_map_v6';
   const SIZE_KEY = 'chrono_mobile_button_scale_v6';
   const canvasEl = document.getElementById('game');
@@ -21613,10 +21730,9 @@ function removeTickets(){try{$('#powerTickets544')?.remove();$('#powerTickets548
   const gameShell = document.querySelector('.game-shell');
   const hud = document.querySelector('.hud');
 
-  const hasPointerTouch = () => {
-    try { return matchMedia('(hover:none), (pointer:coarse)').matches || navigator.maxTouchPoints > 0; }
-    catch { return navigator.maxTouchPoints > 0; }
-  };
+  let touchMediaQuery=null;
+  try{touchMediaQuery=matchMedia('(hover:none), (pointer:coarse)');}catch{}
+  const hasPointerTouch = () => !!(touchMediaQuery?.matches || navigator.maxTouchPoints > 0);
   const smallViewport = () => Math.min(window.innerWidth || 0, window.innerHeight || 0) <= 820 || (window.innerWidth || 0) <= 1024;
   const mobileRuntime = () => hasPointerTouch() || smallViewport();
   const visualH = () => Math.max(240, Math.round(window.visualViewport?.height || window.innerHeight || 780));
@@ -21724,11 +21840,19 @@ function removeTickets(){try{$('#powerTickets544')?.remove();$('#powerTickets548
     } catch {}
   }
 
+  let fitRaf=0,fitTimer=0;
   function scheduleFit(){
-    syncRuntimeClass();
-    fitCanvasForScreen();
-    setTimeout(() => { syncRuntimeClass(); fitCanvasForScreen(); applySavedLayout(); }, 40);
-    setTimeout(() => { syncRuntimeClass(); fitCanvasForScreen(); applySavedLayout(); }, 220);
+    if(fitRaf) cancelAnimationFrame(fitRaf);
+    if(fitTimer) clearTimeout(fitTimer);
+    fitRaf=requestAnimationFrame(()=>{
+      fitRaf=0;
+      syncRuntimeClass();fitCanvasForScreen();applySavedLayout();
+    });
+    // One delayed pass is enough for browser chrome/orientation settling.
+    fitTimer=setTimeout(()=>{
+      fitTimer=0;
+      syncRuntimeClass();fitCanvasForScreen();applySavedLayout();
+    },180);
   }
 
   function syncRuntimeClass(){
@@ -21783,7 +21907,7 @@ function removeTickets(){try{$('#powerTickets544')?.remove();$('#powerTickets548
   function moveKnob(joyId, x, y){
     const joy = byId(joyId); const knob = joy?.querySelector('.cs-joy-knob');
     if (!knob) return;
-    const travel = Math.max(18, Math.min(34, joy.getBoundingClientRect().width * .22));
+    const travel = joy.__csKnobTravel || 22;
     knob.style.transform = `translate(calc(-50% + ${x * travel}px), calc(-50% + ${y * travel}px))`;
   }
 
@@ -21916,14 +22040,16 @@ function removeTickets(){try{$('#powerTickets544')?.remove();$('#powerTickets548
   };
   function applyBox(el, box){
     if (!el || !box) return;
-    Object.assign(el.style, {
-      position:'fixed', left:Math.round(box.x)+'px', top:Math.round(box.y)+'px', right:'auto', bottom:'auto',
-      width:Math.round(box.w)+'px', height:Math.round(box.h)+'px'
-    });
+    const x=Math.round(box.x),y=Math.round(box.y),w=Math.round(box.w),h=Math.round(box.h);
+    const signature=`${x},${y},${w},${h}`;
+    if(el.dataset.csLayoutBox===signature) return;
+    el.dataset.csLayoutBox=signature;
+    el.__csKnobTravel=Math.max(18,Math.min(34,w*.22));
+    Object.assign(el.style, {position:'fixed',left:x+'px',top:y+'px',right:'auto',bottom:'auto',width:w+'px',height:h+'px'});
   }
   function clearMobileInline(){
     ['#skillIcon1','#skillIcon2','#skillIcon3','#ultimateIcon','#darkUltimateIcon','#moonUltimate37','#awakUltIcon480','#pauseBtn'].forEach(sel => {
-      document.querySelectorAll(sel).forEach(el => { ['left','top','right','bottom','width','height','position'].forEach(p => el.style.removeProperty(p)); });
+      document.querySelectorAll(sel).forEach(el => { ['left','top','right','bottom','width','height','position'].forEach(p => el.style.removeProperty(p)); delete el.dataset.csLayoutBox; });
     });
   }
   function applySavedLayout(force=false){
@@ -22082,8 +22208,14 @@ function removeTickets(){try{$('#powerTickets544')?.remove();$('#powerTickets548
     try { (0,eval)(`${name}=window.${name}`); } catch {}
   }
 
+  let lowGfxCache=false,lowGfxCheckedAt=-1e9;
   function lowGfxEnabled(){
-    try { const raw=localStorage.getItem(typeof SAVE_KEY!=='undefined'?SAVE_KEY:'chrono_v4_meta'); return !!JSON.parse(raw||'{}').gfxLow; } catch { return false; }
+    const now=performance.now();
+    if(now-lowGfxCheckedAt<750)return lowGfxCache;
+    lowGfxCheckedAt=now;
+    try { const raw=localStorage.getItem(typeof SAVE_KEY!=='undefined'?SAVE_KEY:'chrono_v4_meta'); lowGfxCache=!!JSON.parse(raw||'{}').gfxLow; }
+    catch { lowGfxCache=false; }
+    return lowGfxCache;
   }
   function perfMode(){ return hasPointerTouch() || lowGfxEnabled() || visualW()*visualH()<520000; }
   function wrapEffects(){
@@ -22221,5 +22353,58 @@ function removeTickets(){try{$('#powerTickets544')?.remove();$('#powerTickets548
 </script>
 
 
+
+<script id="chrono-runtime-optimizer-620">
+(() => {
+  'use strict';
+  if(window.__chronoRuntimeOptimizer620)return;
+  window.__chronoRuntimeOptimizer620=true;
+  let touchQuery=null;try{touchQuery=matchMedia('(hover:none),(pointer:coarse)')}catch{}
+  const mobile=()=>!!(touchQuery?.matches||navigator.maxTouchPoints>0||innerWidth<=1024);
+  let lowCache=false,lowCheckedAt=-1e9;
+  const low=()=>{
+    const now=performance.now();if(now-lowCheckedAt<750)return lowCache;lowCheckedAt=now;
+    try{lowCache=!!JSON.parse(localStorage.getItem(typeof SAVE_KEY!=='undefined'?SAVE_KEY:'chrono_v4_meta')||'{}').gfxLow}catch{lowCache=false}
+    return lowCache;
+  };
+  const trim=(arr,max)=>{if(Array.isArray(arr)&&arr.length>max)arr.splice(0,arr.length-max)};
+  let capClock=0,lastLowRender=0;
+  try{
+    const previousUpdateFX=updateFX;
+    updateFX=function(dt){
+      const result=previousUpdateFX.apply(this,arguments);
+      capClock+=Number(dt)||0;
+      if(capClock<.2)return result;
+      capClock=0;
+      const g=game;if(!g)return result;
+      const isLow=low(),isMobile=mobile();
+      trim(g.particles,isLow?100:isMobile?190:360);
+      trim(g.rings,isLow?24:isMobile?44:80);
+      trim(g.lightnings,isLow?12:isMobile?24:44);
+      trim(g.shockwaves,isLow?10:isMobile?20:36);
+      trim(g.floatingTexts,isLow?28:isMobile?48:90);
+      if(g.player?.trail?.length>12)g.player.trail.length=12;
+      for(const air of g.colonelAirstrikes||[])trim(air.path,isLow?12:isMobile?24:40);
+      try{trim(ECLIPSE_UPDATE?.notices,12)}catch{}
+      return result;
+    };
+    window.updateFX=updateFX;
+  }catch{}
+  // Low GFX is an explicit player choice: retain 60 Hz simulation while
+  // rendering at 30 FPS to cut the largest Canvas cost in half.
+  try{
+    const previousRender=render;
+    render=function(){
+      if(low()&&mobile()){
+        const now=performance.now();
+        if(now-lastLowRender<30)return;
+        lastLowRender=now;
+      }
+      return previousRender.apply(this,arguments);
+    };
+    window.render=render;
+  }catch{}
+})();
+</script>
 </body>
 </html>
