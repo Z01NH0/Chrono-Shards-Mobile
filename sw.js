@@ -1,89 +1,85 @@
-{
-  "id": "./",
-  "name": "Chrono Shards",
-  "short_name": "Chrono Shards",
-  "description": "Escolha seu personagem, domine habilidades únicas, enfrente hordas cada vez mais brutais e evolua sua build com power-ups, relíquias, maestrias e recompensas raras. Cada partida é uma nova tentativa de ir mais longe, derrotar chefes mais perigosos e descobrir até onde você consegue resistir antes que o Eclipse consuma tudo.",
-  "start_url": "./",
-  "scope": "./",
-  "display": "fullscreen",
-  "display_override": [
-    "fullscreen",
-    "standalone",
-    "minimal-ui",
-    "browser"
-  ],
-  "orientation": "landscape",
-  "background_color": "#020408",
-  "theme_color": "#090d1f",
-  "lang": "pt-BR",
-  "dir": "auto",
-  "categories": [
-    "games",
-    "entertainment"
-  ],
-  "prefer_related_applications": false,
-  "icons": [
-    {
-      "src": "icons/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "icons/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "icons/icon-maskable-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
-    }
-  ],
-  "screenshots": [
-    {
-      "src": "screenshots/showcase-1.png",
-      "sizes": "1280x720",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "Combate em arena com poderes chronais e efeitos visuais intensos."
-    },
-    {
-      "src": "screenshots/showcase-2.png",
-      "sizes": "1280x720",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "Batalhas contra hordas, projéteis, bosses e eventos especiais."
-    },
-    {
-      "src": "screenshots/showcase-3.png",
-      "sizes": "1280x720",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "Mapas neon com obstáculos, inimigos, loot e progressão por run."
-    },
-    {
-      "src": "screenshots/showcase-4.png",
-      "sizes": "1280x720",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "Habilidades únicas, escudos, ataques especiais e caos temporal."
-    }
-  ],
-  "shortcuts": [
-    {
-      "name": "Jogar Agora",
-      "short_name": "Jogar",
-      "description": "Inicia o jogo diretamente",
-      "url": "./",
-      "icons": [
-        {
-          "src": "icons/icon-192.png",
-          "sizes": "192x192"
-        }
-      ]
-    }
-  ]
+'use strict';
+
+const CACHE_VERSION = 'chrono-shards-mobile-v6.2.0';
+const CORE_CACHE = `${CACHE_VERSION}-core`;
+const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
+const CORE_ASSETS = [
+  './',
+  './index.html',
+  './manifest.webmanifest',
+  './icons/apple-touch-icon.png',
+  './icons/icon-192.png',
+  './icons/icon-512.png',
+  './icons/icon-maskable-512.png'
+];
+
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(CORE_CACHE)
+      .then(cache => cache.addAll(CORE_ASSETS))
+      .then(() => self.skipWaiting())
+  );
+});
+
+self.addEventListener('activate', event => {
+  event.waitUntil((async () => {
+    const names = await caches.keys();
+    await Promise.all(names
+      .filter(name => name.startsWith('chrono-shards-') && name !== CORE_CACHE && name !== RUNTIME_CACHE)
+      .map(name => caches.delete(name)));
+    await self.clients.claim();
+  })());
+});
+
+function cacheable(response){
+  return response && (response.ok || response.type === 'opaque');
 }
+
+async function networkFirstNavigation(request){
+  const cache = await caches.open(CORE_CACHE);
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 3500);
+    const response = await fetch(request, {signal: controller.signal, cache: 'no-cache'});
+    clearTimeout(timer);
+    if (cacheable(response)) await cache.put('./index.html', response.clone());
+    return response;
+  } catch {
+    return (await cache.match('./index.html')) || (await cache.match('./')) || Response.error();
+  }
+}
+
+async function staleWhileRevalidate(request){
+  const cache = await caches.open(RUNTIME_CACHE);
+  const cached = await cache.match(request);
+  const fresh = fetch(request).then(async response => {
+    if (cacheable(response)) await cache.put(request, response.clone());
+    return response;
+  }).catch(() => null);
+  return cached || (await fresh) || Response.error();
+}
+
+self.addEventListener('fetch', event => {
+  const request = event.request;
+  if (request.method !== 'GET' || request.headers.has('range')) return;
+  const url = new URL(request.url);
+  if (!['http:', 'https:'].includes(url.protocol)) return;
+
+  if (request.mode === 'navigate') {
+    event.respondWith(networkFirstNavigation(request));
+    return;
+  }
+
+  if (url.origin === self.location.origin) {
+    event.respondWith(staleWhileRevalidate(request));
+    return;
+  }
+
+  if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
+    event.respondWith(staleWhileRevalidate(request));
+  }
+});
+
+self.addEventListener('message', event => {
+  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
+});
